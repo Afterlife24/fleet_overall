@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* AxleOps brand — Indigo / violet SaaS palette */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 13%;
+    --primary: 239 84% 67%;             /* Indigo #6366f1 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 226 30% 95%;
+    --secondary-foreground: 222 47% 13%;
+    --muted: 226 20% 96%;
+    --muted-foreground: 222 12% 50%;
+    --accent: 239 84% 96%;              /* Light indigo tint */
+    --accent-foreground: 243 75% 45%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 226 20% 88%;
+    --input: 226 20% 88%;
+    --ring: 239 84% 67%;                /* Indigo ring */
+    --chart-1: 239 84% 67%;            /* Indigo */
+    --chart-2: 258 90% 66%;            /* Violet */
+    --chart-3: 38 92% 50%;             /* Amber */
+    --chart-4: 0 72% 51%;              /* Red */
+    --chart-5: 160 70% 45%;            /* Teal */
+    --radius: 0.5rem;
+  }
+  .dark {
+    /* Dark mode — deep slate background, indigo primary */
+    --background: 222 47% 8%;
+    --foreground: 210 20% 98%;
+    --card: 222 44% 11%;
+    --card-foreground: 210 20% 98%;
+    --popover: 222 44% 11%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 239 84% 70%;             /* Indigo stays bright */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 35% 16%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 222 35% 16%;
+    --muted-foreground: 215 16% 60%;
+    --accent: 222 35% 18%;
+    --accent-foreground: 239 84% 75%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 35% 20%;
+    --input: 222 35% 20%;
+    --ring: 239 84% 70%;
+    --chart-1: 239 84% 70%;            /* Indigo */
+    --chart-2: 258 90% 70%;            /* Violet */
+    --chart-3: 38 92% 55%;             /* Amber */
+    --chart-4: 0 72% 55%;              /* Red */
+    --chart-5: 160 70% 45%;            /* Teal */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Smooth focus ring */
+*:focus-visible {
+  outline: none;
+}
