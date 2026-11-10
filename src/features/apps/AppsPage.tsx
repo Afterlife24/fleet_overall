@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuthStore } from '@/store/authStore';
@@ -8,14 +9,15 @@ import { INSTALLABLE_APPS, getApp, type AppDef } from '@/constants/apps';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { cn } from '@/lib/utils';
-import { Plus, Power, ShieldCheck, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { Check, Plus, Power, ShieldCheck, LayoutGrid, AlertTriangle } from 'lucide-react';
 
-const CATEGORIES = ['All', 'Operations', 'Inspections', 'Documents', 'Management'] as const;
+const CATEGORIES = ['All', 'Operations', 'Inspections', 'Management'] as const;
 type Cat = (typeof CATEGORIES)[number];
 
 export function AppsPage() {
   const user = useAuthStore((s) => s.user);
   const activeApps = useOrgStore((s) => (user ? s.getActiveApps(user.orgId) : []));
+  // subscribe so cards re-render on toggle
   useOrgStore((s) => s.installedApps);
   const activate = useOrgStore((s) => s.activateApp);
   const deactivate = useOrgStore((s) => s.deactivateApp);
@@ -41,6 +43,7 @@ export function AppsPage() {
     toastSuccess(deps.length ? `${app.name} activated (also enabled ${deps.join(', ')})` : `${app.name} activated`);
   };
 
+  // Deactivation asks for confirmation first (data is kept, not cleared).
   const requestDeactivate = (app: AppDef) => {
     if (!isOwner) { toastError('Only the owner can manage apps'); return; }
     setConfirmApp(app);
@@ -64,7 +67,7 @@ export function AppsPage() {
       {!isOwner && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
           <ShieldCheck className="h-4 w-4 shrink-0" />
-          Only the company owner can activate or deactivate apps. You can view what&apos;s available.
+          Only the company owner can activate or deactivate apps. You can view what's available.
         </div>
       )}
 
@@ -78,9 +81,7 @@ export function AppsPage() {
               onClick={() => setCat(c)}
               className={cn(
                 'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                cat === c
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:bg-accent'
+                cat === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'
               )}
             >
               {c}
@@ -92,102 +93,58 @@ export function AppsPage() {
       {apps.length === 0 ? (
         <EmptyState icon={LayoutGrid} title="No apps in this category" />
       ) : (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-semibold text-foreground">App</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground w-32">Category</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground w-28">Active</th>
-                <th className="px-4 py-3 text-left font-semibold text-foreground w-36">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map((app, idx) => {
-                const active = activeSet.has(app.id);
-                const Icon = app.icon;
-                const deps = (app.depends ?? []).map((d) => getApp(d)?.name).filter(Boolean) as string[];
-                return (
-                  <tr
-                    key={app.id}
-                    className={cn(
-                      'border-b last:border-0 transition-colors hover:bg-muted/30',
-                      idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'
-                    )}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {apps.map((app) => {
+            const active = activeSet.has(app.id);
+            const Icon = app.icon;
+            const deps = (app.depends ?? []).map((d) => getApp(d)?.name).filter(Boolean) as string[];
+            return (
+              <Card key={app.id} className="flex flex-col p-4">
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white"
+                    style={{ background: `linear-gradient(135deg, ${app.color ?? '#6366f1'}, ${app.color ?? '#8b5cf6'}cc)` }}
                   >
-                    {/* App */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white"
-                          style={{ background: `linear-gradient(135deg, ${app.color ?? '#6366f1'}, ${app.color ?? '#8b5cf6'}cc)` }}
-                        >
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground leading-tight">{app.name}</p>
-                          <p className="text-xs text-muted-foreground leading-snug mt-0.5">{app.summary}</p>
-                          {deps.length > 0 && (
-                            <p className="text-[11px] text-muted-foreground/60 mt-0.5">Requires: {deps.join(', ')}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Category */}
-                    <td className="px-4 py-3">
-                      <span className="inline-block rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {app.category}
-                      </span>
-                    </td>
-
-                    {/* Active */}
-                    <td className="px-4 py-3">
-                      {active ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-                          Inactive
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground">{app.name}</h3>
+                      {active && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                          <Check className="h-2.5 w-2.5" /> Active
                         </span>
                       )}
-                    </td>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{app.summary}</p>
+                    {deps.length > 0 && (
+                      <p className="mt-1 text-[11px] text-muted-foreground/70">Requires: {deps.join(', ')}</p>
+                    )}
+                  </div>
+                </div>
 
-                    {/* Action */}
-                    <td className="px-4 py-3">
-                      {active ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!isOwner}
-                          onClick={() => requestDeactivate(app)}
-                          className="text-rose-600 hover:text-rose-700 dark:text-rose-400 h-7 text-xs"
-                        >
-                          <Power className="mr-1 h-3 w-3" /> Deactivate
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          disabled={!isOwner}
-                          onClick={() => onActivate(app)}
-                          className="h-7 text-xs"
-                        >
-                          <Plus className="mr-1 h-3 w-3" /> Activate
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                <div className="mt-4 flex items-center gap-2">
+                  {active ? (
+                    <Button
+                      variant="outline" size="sm" disabled={!isOwner}
+                      onClick={() => requestDeactivate(app)}
+                      className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                    >
+                      <Power className="mr-1.5 h-4 w-4" /> Deactivate
+                    </Button>
+                  ) : (
+                    <Button size="sm" disabled={!isOwner} onClick={() => onActivate(app)}>
+                      <Plus className="mr-1.5 h-4 w-4" /> Activate
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Deactivate confirmation */}
+      {/* Deactivate confirmation — data is kept, not cleared */}
       <Dialog open={!!confirmApp} onOpenChange={(o) => !o && setConfirmApp(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
