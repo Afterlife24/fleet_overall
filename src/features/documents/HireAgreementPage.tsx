@@ -106,6 +106,28 @@ export function HireAgreementPage() {
     });
   };
 
+  // Auto-fill when Customer Name is selected from dropdown
+  const handleCustomerNameSelect = (name: string) => {
+    const match = (customers as CustomerANI[] ?? []).find(
+      (c) => c.customerName === name
+    );
+    if (match) {
+      setForm((prev) => ({
+        ...prev,
+        customerName: match.customerName,
+        customerId: match.customerId,
+        customerTrn: match.trn,
+        attn: match.attn ?? '',
+        contactPerson: match.attn ?? '',
+        contactNumber: match.contactNumber,
+        customerEmail: match.email ?? '',
+        billingAddress: match.billingAddress ?? match.address,
+      }));
+    } else {
+      setField('customerName', name);
+    }
+  };
+
   // Auto-fill customer details when Customer ID changes
   const handleCustomerIdChange = (id: string) => {
     setField('customerId', id);
@@ -323,14 +345,31 @@ export function HireAgreementPage() {
                 </tr>
               </thead>
               <tbody>
+                {/* Customer Name FIRST — dropdown auto-fills all other fields */}
                 <tr className="even:bg-gray-50">
+                  <td className="border border-gray-200 px-3 py-1.5 font-medium">Customer Name</td>
+                  <td className="border border-gray-200 px-3 py-1.5">
+                    <select
+                      className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
+                      value={f.customerName ?? ''}
+                      onChange={(e) => handleCustomerNameSelect(e.target.value)}
+                    >
+                      <option value="">— Select Customer —</option>
+                      {(customers as CustomerANI[] ?? []).map((c) => (
+                        <option key={c.id} value={c.customerName}>{c.customerName}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+                {/* Customer ID — auto-filled, still editable */}
+                <tr>
                   <td className="border border-gray-200 px-3 py-1.5 font-medium">Customer ID</td>
                   <td className="border border-gray-200 px-3 py-1.5">
                     <input
                       className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
                       value={f.customerId ?? ''}
                       onChange={(e) => handleCustomerIdChange(e.target.value)}
-                      placeholder="Type Customer ID to auto-fill…"
+                      placeholder="Auto-filled from Customer Name…"
                       list="customer-id-list"
                     />
                     <datalist id="customer-id-list">
@@ -341,7 +380,6 @@ export function HireAgreementPage() {
                   </td>
                 </tr>
                 {([
-                  ['Customer Name', 'customerName'],
                   ['TRN No.', 'customerTrn'],
                   ['Attention (Attn)', 'attn'],
                   ['Contact Person', 'contactPerson'],

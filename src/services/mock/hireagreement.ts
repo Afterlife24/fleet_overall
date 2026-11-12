@@ -2,8 +2,9 @@
 
 /**
  * 5 demo hire agreements.
- * Customer IDs, names, TRNs, contacts and addresses exactly match the 5
- * customers in customerani.ts so the auto-fill works in the form.
+ * Company names: alphabet-style (ABC, DEF, GHI, JKL, MNO) — matches customerani.ts exactly.
+ * ATTN / contact person: world cricketers — matches customerani.ts exactly.
+ * All fields populated, no empty columns.
  */
 export const hireAgreements: HireAgreement[] = [
   {
@@ -11,23 +12,20 @@ export const hireAgreements: HireAgreement[] = [
     agreementNo: 'HA-2026-001',
     date: '2026-11-07',
     status: 'Active',
-    // Lessor
     lessorName: 'Johnson Arabia LLC',
     lessorTradeLicense: 'JA-TL-2024-001',
     lessorTrn: '100234567800003',
     lessorAddress: 'Office 1204, Business Centre, Dubai, UAE',
     lessorPhone: '+971 4 123 4567',
     lessorEmail: 'info@johnsonarabia.com',
-    // Hirer — matches CUST-000125
     customerId: 'CUST-000125',
-    customerName: 'Al Futtaim Engineering LLC',
+    customerName: 'ABC Company LLC',
     customerTrn: '100412345600003',
-    attn: 'Mr. Ahmed Khan',
-    contactPerson: 'Ahmed Khan',
+    attn: 'Mr. Virat Kohli',
+    contactPerson: 'Virat Kohli',
     contactNumber: '+971 50 123 4567',
-    customerEmail: 'ahmed.khan@alfuttaim.com',
-    billingAddress: 'Al Futtaim Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
-    // Equipment
+    customerEmail: 'virat.kohli@abccompany.com',
+    billingAddress: 'ABC Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
     equipmentName: 'Mobile Elevated Work Platform',
     equipmentModel: 'JLG 450AJ',
     serialNumber: 'JLG450-2026-001',
@@ -38,7 +36,6 @@ export const hireAgreements: HireAgreement[] = [
     hireStartDate: '2026-11-15',
     hireEndDate: '2026-12-15',
     hireDuration: '30 days',
-    // Charges
     monthlyRental: 8000,
     transportationCharges: 500,
     subtotal: 8500,
@@ -61,15 +58,14 @@ export const hireAgreements: HireAgreement[] = [
     lessorAddress: 'Office 1204, Business Centre, Dubai, UAE',
     lessorPhone: '+971 4 123 4567',
     lessorEmail: 'info@johnsonarabia.com',
-    // Hirer — matches CUST-000248
     customerId: 'CUST-000248',
-    customerName: 'Arabtec Construction LLC',
+    customerName: 'DEF Company LLC',
     customerTrn: '100567890100003',
-    attn: 'Ms. Sara Ali',
-    contactPerson: 'Sara Ali',
+    attn: 'Mr. Rohit Sharma',
+    contactPerson: 'Rohit Sharma',
     contactNumber: '+971 50 234 5678',
-    customerEmail: 'sara.ali@arabtec.ae',
-    billingAddress: 'Arabtec Tower, Airport Rd, Abu Dhabi, UAE',
+    customerEmail: 'rohit.sharma@defcompany.com',
+    billingAddress: 'DEF Building, Airport Rd, Abu Dhabi, UAE',
     equipmentName: 'Scissor Lift',
     equipmentModel: 'Skyjack SJ3226',
     serialNumber: 'SJ3226-2026-002',
@@ -102,15 +98,14 @@ export const hireAgreements: HireAgreement[] = [
     lessorAddress: 'Office 1204, Business Centre, Dubai, UAE',
     lessorPhone: '+971 4 123 4567',
     lessorEmail: 'info@johnsonarabia.com',
-    // Hirer — matches CUST-000371
     customerId: 'CUST-000371',
-    customerName: 'Nakheel Properties PJSC',
+    customerName: 'GHI Company PJSC',
     customerTrn: '100789012300003',
-    attn: 'Mr. John Smith',
-    contactPerson: 'John Smith',
+    attn: 'Mr. Steve Smith',
+    contactPerson: 'Steve Smith',
     contactNumber: '+971 50 345 6789',
-    customerEmail: 'john.smith@nakheel.ae',
-    billingAddress: 'Nakheel HQ, Palm Jumeirah, Dubai, UAE',
+    customerEmail: 'steve.smith@ghicompany.com',
+    billingAddress: 'GHI HQ, Palm Jumeirah, Dubai, UAE',
     equipmentName: 'Articulating Boom Lift',
     equipmentModel: 'Genie Z-45/25J',
     serialNumber: 'GZ45-2026-003',
@@ -143,15 +138,14 @@ export const hireAgreements: HireAgreement[] = [
     lessorAddress: 'Office 1204, Business Centre, Dubai, UAE',
     lessorPhone: '+971 4 123 4567',
     lessorEmail: 'info@johnsonarabia.com',
-    // Hirer — matches CUST-000419
     customerId: 'CUST-000419',
-    customerName: 'Emaar Properties LLC',
+    customerName: 'JKL Company LLC',
     customerTrn: '100890123400003',
-    attn: 'Ms. Priya Nair',
-    contactPerson: 'Priya Nair',
+    attn: 'Mr. Joe Root',
+    contactPerson: 'Joe Root',
     contactNumber: '+971 50 456 7890',
-    customerEmail: 'priya.nair@emaar.ae',
-    billingAddress: 'Emaar Square, Downtown Dubai, UAE',
+    customerEmail: 'joe.root@jklcompany.com',
+    billingAddress: 'JKL Square, Downtown Dubai, UAE',
     equipmentName: 'Rough Terrain Scissor Lift',
     equipmentModel: 'JLG 3394RT',
     serialNumber: 'JLG3394-2026-004',
@@ -184,15 +178,14 @@ export const hireAgreements: HireAgreement[] = [
     lessorAddress: 'Office 1204, Business Centre, Dubai, UAE',
     lessorPhone: '+971 4 123 4567',
     lessorEmail: 'info@johnsonarabia.com',
-    // Hirer — matches CUST-000532
     customerId: 'CUST-000532',
-    customerName: 'Al Naboodah Group LLC',
+    customerName: 'MNO Company LLC',
     customerTrn: '100901234500003',
-    attn: 'Mr. Mohammed Al Rashid',
-    contactPerson: 'Mohammed Al Rashid',
+    attn: 'Mr. Kane Williamson',
+    contactPerson: 'Kane Williamson',
     contactNumber: '+971 50 567 8901',
-    customerEmail: 'mohammed.alrashid@alnaboodah.com',
-    billingAddress: 'Al Naboodah Centre, Al Qasimia, Sharjah, UAE',
+    customerEmail: 'kane.williamson@mnocompany.com',
+    billingAddress: 'MNO Centre, Al Qasimia, Sharjah, UAE',
     equipmentName: 'Telescopic Boom Lift',
     equipmentModel: 'Manitou 180ATJ',
     serialNumber: 'MAN180-2026-005',

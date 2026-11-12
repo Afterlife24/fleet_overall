@@ -1,9 +1,11 @@
 ﻿import type { CustomerANI } from '@/types/customerani';
 
 /**
- * 5 fixed demo customers.
- * Customer IDs, names, TRNs, contacts and addresses are identical to the
- * 5 hire agreements in hireagreement.ts so auto-fill works perfectly.
+ * 5 demo customers.
+ * - Company names: alphabet-style (ABC, DEF, GHI, JKL, MNO)
+ * - Contact/ATTN names: world cricketers
+ * - All aniRavaliActive: true (Task 2)
+ * - IDs/TRNs/contacts match hireagreement.ts exactly
  */
 export const customerANIs: CustomerANI[] = [
   {
@@ -11,12 +13,12 @@ export const customerANIs: CustomerANI[] = [
     fleetLogId: 'FL-00001',
     aniRavaliActive: true,
     customerId: 'CUST-000125',
-    customerName: 'Al Futtaim Engineering LLC',
+    customerName: 'ABC Company LLC',
     trn: '100412345600003',
-    attn: 'Mr. Ahmed Khan',
-    address: 'Al Futtaim Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
-    billingAddress: 'Al Futtaim Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
-    email: 'ahmed.khan@alfuttaim.com',
+    attn: 'Mr. Virat Kohli',
+    address: 'ABC Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
+    billingAddress: 'ABC Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
+    email: 'virat.kohli@abccompany.com',
     attl: 500000,
     contactNumber: '+971 50 123 4567',
     status: 'Active',
@@ -29,12 +31,12 @@ export const customerANIs: CustomerANI[] = [
     fleetLogId: 'FL-00002',
     aniRavaliActive: true,
     customerId: 'CUST-000248',
-    customerName: 'Arabtec Construction LLC',
+    customerName: 'DEF Company LLC',
     trn: '100567890100003',
-    attn: 'Ms. Sara Ali',
-    address: 'Arabtec Tower, Airport Rd, Abu Dhabi, UAE',
-    billingAddress: 'Arabtec Tower, Airport Rd, Abu Dhabi, UAE',
-    email: 'sara.ali@arabtec.ae',
+    attn: 'Mr. Rohit Sharma',
+    address: 'DEF Building, Airport Rd, Abu Dhabi, UAE',
+    billingAddress: 'DEF Building, Airport Rd, Abu Dhabi, UAE',
+    email: 'rohit.sharma@defcompany.com',
     attl: 750000,
     contactNumber: '+971 50 234 5678',
     status: 'Active',
@@ -47,12 +49,12 @@ export const customerANIs: CustomerANI[] = [
     fleetLogId: 'FL-00003',
     aniRavaliActive: true,
     customerId: 'CUST-000371',
-    customerName: 'Nakheel Properties PJSC',
+    customerName: 'GHI Company PJSC',
     trn: '100789012300003',
-    attn: 'Mr. John Smith',
-    address: 'Nakheel HQ, Palm Jumeirah, Dubai, UAE',
-    billingAddress: 'Nakheel HQ, Palm Jumeirah, Dubai, UAE',
-    email: 'john.smith@nakheel.ae',
+    attn: 'Mr. Steve Smith',
+    address: 'GHI HQ, Palm Jumeirah, Dubai, UAE',
+    billingAddress: 'GHI HQ, Palm Jumeirah, Dubai, UAE',
+    email: 'steve.smith@ghicompany.com',
     attl: 900000,
     contactNumber: '+971 50 345 6789',
     status: 'Active',
@@ -63,14 +65,14 @@ export const customerANIs: CustomerANI[] = [
   {
     id: 'cani-4',
     fleetLogId: 'FL-00004',
-    aniRavaliActive: false,
+    aniRavaliActive: true,
     customerId: 'CUST-000419',
-    customerName: 'Emaar Properties LLC',
+    customerName: 'JKL Company LLC',
     trn: '100890123400003',
-    attn: 'Ms. Priya Nair',
-    address: 'Emaar Square, Downtown Dubai, UAE',
-    billingAddress: 'Emaar Square, Downtown Dubai, UAE',
-    email: 'priya.nair@emaar.ae',
+    attn: 'Mr. Joe Root',
+    address: 'JKL Square, Downtown Dubai, UAE',
+    billingAddress: 'JKL Square, Downtown Dubai, UAE',
+    email: 'joe.root@jklcompany.com',
     attl: 1200000,
     contactNumber: '+971 50 456 7890',
     status: 'Active',
@@ -83,12 +85,12 @@ export const customerANIs: CustomerANI[] = [
     fleetLogId: 'FL-00005',
     aniRavaliActive: true,
     customerId: 'CUST-000532',
-    customerName: 'Al Naboodah Group LLC',
+    customerName: 'MNO Company LLC',
     trn: '100901234500003',
-    attn: 'Mr. Mohammed Al Rashid',
-    address: 'Al Naboodah Centre, Al Qasimia, Sharjah, UAE',
-    billingAddress: 'Al Naboodah Centre, Al Qasimia, Sharjah, UAE',
-    email: 'mohammed.alrashid@alnaboodah.com',
+    attn: 'Mr. Kane Williamson',
+    address: 'MNO Centre, Al Qasimia, Sharjah, UAE',
+    billingAddress: 'MNO Centre, Al Qasimia, Sharjah, UAE',
+    email: 'kane.williamson@mnocompany.com',
     attl: 650000,
     contactNumber: '+971 50 567 8901',
     status: 'Active',
