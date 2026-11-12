@@ -13,13 +13,14 @@ import {
   getBreakdownById, getJobCardById, getUserById, getInspectionsByType, getCrossHireById,
 } from './mock';
 import { CrossHire } from '@/types/crosshire';
+import type { CustomerANI } from '@/types/customerani';
 import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
 import {
   machinesForOrg, crossHiresForOrg, bookingsForOrg, workshopJobsForOrg,
   transportJobsForOrg, inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
   gateEntriesForOrg, customersForOrg, branchesForOrg,
   techniciansForOrg, workshopBaysForOrg, driversForOrg, trucksForOrg,
-  usersForOrg, notificationsForOrg,
+  usersForOrg, notificationsForOrg, customerANIsForOrg,
 } from './mock/orgData';
 
 // Current tenant from the auth session (demo: read straight from the store).
@@ -559,12 +560,56 @@ export const crossHireService = {
 
 import { presetsForApp, type AppPreset } from '@/constants/appPresets';
 
+// ── Customer ANI service ───────────────────────────────────────────────────
+
+export const customerANIService = {
+  list: () => delay(customerANIsForOrg(currentOrgId())),
+  get: (id: string) => delay(customerANIsForOrg(currentOrgId()).find((c) => c.id === id)),
+  create: (data: Partial<CustomerANI>) => {
+    const list = customerANIsForOrg(currentOrgId());
+    const seq = list.length + 1;
+    const newRecord: CustomerANI = {
+      id: `cani-${Date.now()}`,
+      fleetLogId: `FL-${String(seq).padStart(5, '0')}`,
+      aniRavaliActive: false,
+      customerId: `CUS-${Date.now().toString().slice(-4)}`,
+      customerName: '',
+      trn: '',
+      address: '',
+      attl: 0,
+      contactNumber: '',
+      status: 'Active',
+      branchName: 'Head Office',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...data,
+    };
+    list.push(newRecord);
+    return delay(newRecord);
+  },
+  update: (id: string, data: Partial<CustomerANI>) => {
+    const list = customerANIsForOrg(currentOrgId());
+    const index = list.findIndex((c) => c.id === id);
+    if (index === -1) throw new Error('Customer ANI record not found');
+    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
+    return delay(list[index]);
+  },
+  delete: (id: string) => {
+    const list = customerANIsForOrg(currentOrgId());
+    const index = list.findIndex((c) => c.id === id);
+    if (index === -1) throw new Error('Customer ANI record not found');
+    list.splice(index, 1);
+    return delay({ success: true });
+  },
+};
+
 // Which collections each app "owns" — used when clearing an app's data on a
 // "start fresh" reactivation. Backend: this maps to deleting the app's rows.
-const APP_COLLECTIONS: Record<string, Array<'machines' | 'crossHires' | 'branches'>> = {
+const APP_COLLECTIONS: Record<string, Array<'machines' | 'crossHires' | 'branches' | 'customerANIs'>> = {
   fleet: ['machines'],
   cross_hire: ['crossHires'],
   branches: ['branches'],
+  customer_ani: ['customerANIs'],
 };
 
 export const onboardingService = {
@@ -586,6 +631,10 @@ export const onboardingService = {
       await branchService.create(b as any);
       created++;
     }
+    for (const ca of (preset.records as any).customerANIs ?? []) {
+      await customerANIService.create(ca);
+      created++;
+    }
     return delay({ success: true, created });
   },
 
@@ -598,6 +647,7 @@ export const onboardingService = {
     if (cols.includes('machines')) n += machinesForOrg(org).length;
     if (cols.includes('crossHires')) n += crossHiresForOrg(org).length;
     if (cols.includes('branches')) n += branchesForOrg(org).length;
+    if (cols.includes('customerANIs')) n += customerANIsForOrg(org).length;
     return n;
   },
 
@@ -608,6 +658,7 @@ export const onboardingService = {
     if (cols.includes('machines')) machinesForOrg(org).splice(0);
     if (cols.includes('crossHires')) crossHiresForOrg(org).splice(0);
     if (cols.includes('branches')) branchesForOrg(org).splice(0);
+    if (cols.includes('customerANIs')) customerANIsForOrg(org).splice(0);
     return delay({ success: true });
   },
 };

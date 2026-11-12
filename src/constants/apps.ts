@@ -4,6 +4,7 @@ import {
   FileText, AlertTriangle, ShieldCheck, PackageCheck, KanbanSquare,
   Map as MapIcon, Route as RouteIcon, TrendingUp,
   FileSignature, ShoppingCart, Send, Undo2, Receipt, FileSpreadsheet, BadgeDollarSign,
+  Users2,
 } from 'lucide-react';
 
 /**
@@ -172,6 +173,11 @@ export const APPS: AppDef[] = [
   },
 
   // ── Management apps (each standalone) ──────────────────────────────
+  {
+    id: 'customer_ani', name: 'Customer ANI', summary: 'Customer account & network integration — Fleet Log, TRN, ATTL and ANI Ravali activation',
+    icon: Users2, category: 'Management', color: '#06b6d4',
+    paths: ['/customer-ani'], labels: ['Customer ANI'],
+  },
   {
     id: 'reports', name: 'Reports', summary: 'Analytics and performance dashboards',
     icon: BarChart3, category: 'Management', color: '#f97316',

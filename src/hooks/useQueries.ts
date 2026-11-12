@@ -3,7 +3,7 @@ import {
   machineService, bookingService, workshopService, transportService,
   inspectionService, breakdownService, jobCardService, userService,
   notificationService, branchService, customerService, dashboardService, reportService, gateService,
-  sixSigmaService, crossHireService,
+  sixSigmaService, crossHireService, customerANIService,
 } from '@/services/services';
 import { useBranchStore } from '@/store/branchStore';
 
@@ -42,6 +42,8 @@ export const queryKeys = {
   crossHires: ['cross-hires'] as const,
   crossHire: (id: string) => ['cross-hire', id] as const,
   crossHireStats: (branchId: string) => ['cross-hire-stats', branchId] as const,
+  customerANIs: ['customer-anis'] as const,
+  customerANI: (id: string) => ['customer-ani', id] as const,
 };
 
 export function useMachines() {
@@ -618,5 +620,49 @@ export function useSixSigmaMetrics() {
   return useQuery({
     queryKey: queryKeys.sixSigmaMetrics(branchId),
     queryFn: () => sixSigmaService.getMetrics(branchId),
+  });
+}
+
+// ── Customer ANI ───────────────────────────────────────────────────────────
+
+export function useCustomerANIs() {
+  return useQuery({ queryKey: queryKeys.customerANIs, queryFn: customerANIService.list });
+}
+
+export function useCustomerANI(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.customerANI(id || ''),
+    queryFn: () => customerANIService.get(id!),
+    enabled: !!id,
+  });
+}
+
+export function useCreateCustomerANI() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => customerANIService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customerANIs });
+    },
+  });
+}
+
+export function useUpdateCustomerANI() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => customerANIService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customerANIs });
+    },
+  });
+}
+
+export function useDeleteCustomerANI() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => customerANIService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.customerANIs });
+    },
   });
 }

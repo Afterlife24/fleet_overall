@@ -12,3 +12,4 @@ export { users, getUserById } from './users';
 export { notifications } from './notifications';
 export { gateEntries } from './gate';
 export { crossHires, getCrossHireById } from './crosshire';
+export { customerANIs, getCustomerANIById } from './customerani';

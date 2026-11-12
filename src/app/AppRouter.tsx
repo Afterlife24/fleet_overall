@@ -38,6 +38,7 @@ const StatisticsPage = lazy(() => import('@/features/statistics/StatisticsPage')
 const BranchesPage = lazy(() => import('@/features/branches/BranchesPage').then(m => ({ default: m.BranchesPage })));
 const DocumentAppPage = lazy(() => import('@/features/documents/DocumentAppPage').then(m => ({ default: m.DocumentAppPage })));
 const NotFoundPage = lazy(() => import('@/features/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const CustomerANIPage = lazy(() => import('@/features/customerani/CustomerANIPage').then(m => ({ default: m.CustomerANIPage })));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -155,6 +156,7 @@ export function AppRouter() {
           <Route path="/docs/invoice" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="invoice" /></Suspense></AppGuard>} />
           <Route path="/docs/soa" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="soa" /></Suspense></AppGuard>} />
           <Route path="/docs/payment-receipt" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="payment_receipt" /></Suspense></AppGuard>} />
+          <Route path="/customer-ani" element={<AppGuard><Suspense fallback={<LoadingState />}><CustomerANIPage /></Suspense></AppGuard>} />
           <Route path="/notifications" element={<Suspense fallback={<LoadingState />}><NotificationsPage /></Suspense>} />
           <Route path="/users" element={<Navigate to="/team" replace />} />
           <Route path="/settings" element={<AdminGuard><Suspense fallback={<LoadingState />}><SettingsPage /></Suspense></AdminGuard>} />

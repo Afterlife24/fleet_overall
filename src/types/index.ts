@@ -12,3 +12,4 @@ export * from './notification';
 export * from './jobcard';
 export * from './report';
 export * from './gate';
+export * from './customerani';

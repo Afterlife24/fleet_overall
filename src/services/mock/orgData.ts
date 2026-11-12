@@ -4,8 +4,10 @@ import type {
   AppNotification, GateEntry,
 } from '@/types';
 import type { CrossHire } from '@/types/crosshire';
+import type { CustomerANI } from '@/types/customerani';
 import { JA_ORG_ID } from '@/store/orgStore';
 import demo from './johnsonArabiaDemo.json';
+import { customerANIs as demoCustomerANIs } from './customerani';
 
 /**
  * Per-organization data (demo).
@@ -78,3 +80,14 @@ export const notificationsForOrg = (orgId: string) => collectionForOrg(orgId, 'n
 // Branches: Johnson Arabia has its 6 real branches; a new company has none
 // until the owner creates them.
 export const branchesForOrg = (orgId: string) => collectionForOrg(orgId, 'branches');
+
+// ── Customer ANI (independent dataset, not part of the JA demo JSON) ─────────
+// JA org gets the full 20-record demo set; new orgs start empty.
+const customerANICache: Record<string, CustomerANI[]> = {};
+
+export function customerANIsForOrg(orgId: string): CustomerANI[] {
+  if (!customerANICache[orgId]) {
+    customerANICache[orgId] = orgId === JA_ORG_ID ? [...demoCustomerANIs] : [];
+  }
+  return customerANICache[orgId];
+}
