@@ -1,16 +1,5 @@
-/**
- * Customer ANI (Account & Network Integration) — a full customer master record.
- *
- * Fields (per spec):
- *  - Fleet Log ID (auto-generated reference)
- *  - Customer ANI Plugin
- *  - Activate ANI Ravali flag
- *  - Customer ID
- *  - Customer Name
- *  - TRN (Tax Registration Number)
- *  - Address
- *  - ATTL (Agreed Total Trade Limit / credit ceiling)
- *  - Contact Number
+﻿/**
+ * Customer (formerly ANI) — full customer master record.
  */
 
 export type CustomerANIStatus = 'Active' | 'Inactive' | 'Suspended';
@@ -26,7 +15,13 @@ export interface CustomerANI {
   customerName: string;
   /** Tax Registration Number */
   trn: string;
+  /** Attention / Contact Person name */
+  attn?: string;
   address: string;
+  /** Customer email */
+  email?: string;
+  /** Billing address (may differ from main address) */
+  billingAddress?: string;
   /** Agreed Total Trade Limit (credit ceiling) in AED */
   attl: number;
   contactNumber: string;

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+﻿import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { LoadingState } from '@/components/common/EmptyState';
@@ -39,6 +39,7 @@ const BranchesPage = lazy(() => import('@/features/branches/BranchesPage').then(
 const DocumentAppPage = lazy(() => import('@/features/documents/DocumentAppPage').then(m => ({ default: m.DocumentAppPage })));
 const NotFoundPage = lazy(() => import('@/features/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const CustomerANIPage = lazy(() => import('@/features/customerani/CustomerANIPage').then(m => ({ default: m.CustomerANIPage })));
+const HireAgreementPage = lazy(() => import('@/features/documents/HireAgreementPage').then(m => ({ default: m.HireAgreementPage })));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -149,7 +150,7 @@ export function AppRouter() {
           <Route path="/six-sigma" element={<AppGuard><Suspense fallback={<LoadingState />}><SixSigmaPage /></Suspense></AppGuard>} />
           <Route path="/statistics" element={<AppGuard><Suspense fallback={<LoadingState />}><StatisticsPage /></Suspense></AppGuard>} />
           <Route path="/branches" element={<AppGuard><Suspense fallback={<LoadingState />}><BranchesPage /></Suspense></AppGuard>} />
-          <Route path="/docs/quotation" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="quotation" /></Suspense></AppGuard>} />
+          <Route path="/docs/quotation" element={<AppGuard><Suspense fallback={<LoadingState />}><HireAgreementPage /></Suspense></AppGuard>} />
           <Route path="/docs/lpo" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="lpo" /></Suspense></AppGuard>} />
           <Route path="/docs/delivery-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="delivery_note" /></Suspense></AppGuard>} />
           <Route path="/docs/collection-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="collection_note" /></Suspense></AppGuard>} />

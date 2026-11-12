@@ -1,4 +1,4 @@
-import {
+﻿import {
   Forklift, ArrowRightLeft, CalendarDays, Wrench, Truck as TruckIcon,
   ScanLine, ClipboardCheck, BarChart3, Building2, Gauge,
   FileText, AlertTriangle, ShieldCheck, PackageCheck, KanbanSquare,
@@ -8,15 +8,15 @@ import {
 } from 'lucide-react';
 
 /**
- * App registry — the AxleOps equivalent of Odoo's `ir.module.module`.
+ * App registry â€” the AxleOps equivalent of Odoo's `ir.module.module`.
  *
  * Each "app" is a toggleable module a company can ACTIVATE or DEACTIVATE from
  * the Apps screen. An app groups one or more sidebar pages (`paths`), the first
  * of which is its landing page. Activating an app makes its pages appear in the
  * sidebar; deactivating hides them (data is kept, Odoo-style).
  *
- * `core` apps (Dashboard, Team, Settings, …) are always available and are not
- * shown on the Apps screen — like Odoo's `base`.
+ * `core` apps (Dashboard, Team, Settings, â€¦) are always available and are not
+ * shown on the Apps screen â€” like Odoo's `base`.
  *
  * `depends` lists app ids that must be active for this app to work. Activating
  * an app auto-activates its dependencies; you can't deactivate an app another
@@ -39,14 +39,14 @@ export interface AppDef {
 }
 
 export const APPS: AppDef[] = [
-  // ── Dashboard (activatable like every other app) ──────────────────
+  // â”€â”€ Dashboard (activatable like every other app) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     id: 'dashboard', name: 'Dashboard', summary: 'Operations overview & KPIs',
     icon: BarChart3, category: 'Operations', color: '#6366f1',
     paths: ['/'], labels: ['Dashboard'],
   },
 
-  // ── Operations apps (toggleable) ──────────────────────────────────
+  // â”€â”€ Operations apps (toggleable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     id: 'fleet', name: 'Fleet', summary: 'Manage machines, assets and availability',
     icon: Forklift, category: 'Operations', color: '#6366f1',
@@ -113,7 +113,7 @@ export const APPS: AppDef[] = [
     paths: ['/branches'], labels: ['Branches'],
   },
 
-  // ── Inspections apps (each standalone) ────────────────────────────
+  // â”€â”€ Inspections apps (each standalone) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     id: 'phi', name: 'PHI Inspection', summary: 'Post-hire inspections',
     icon: ClipboardCheck, category: 'Inspections', color: '#06b6d4', depends: ['fleet'],
@@ -135,7 +135,7 @@ export const APPS: AppDef[] = [
     paths: ['/mqd'], labels: ['MQD'],
   },
 
-  // ── Documents apps (each standalone) ──────────────────────────────
+  // â”€â”€ Documents apps (each standalone) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
     id: 'quotation', name: 'Quotation / Hire Agreement', summary: 'Quotations and hire agreements',
     icon: FileSignature, category: 'Documents', color: '#6366f1',
@@ -172,11 +172,11 @@ export const APPS: AppDef[] = [
     paths: ['/docs/payment-receipt'], labels: ['Payment Receipts'],
   },
 
-  // ── Management apps (each standalone) ──────────────────────────────
+  // â”€â”€ Management apps (each standalone) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'customer_ani', name: 'Customer ANI', summary: 'Customer account & network integration — Fleet Log, TRN, ATTL and ANI Ravali activation',
+    id: 'customer_ani', name: 'Customer ANI', summary: 'Customer account & network integration â€” Fleet Log, TRN, ATTL and ANI Ravali activation',
     icon: Users2, category: 'Management', color: '#06b6d4',
-    paths: ['/customer-ani'], labels: ['Customer ANI'],
+    paths: ['/customer-ani'], labels: ['Customer'],
   },
   {
     id: 'reports', name: 'Reports', summary: 'Analytics and performance dashboards',
@@ -207,13 +207,13 @@ export const APPS: AppDef[] = [
 ];
 
 /**
- * Fixed workspace items — always in the sidebar, never activatable, not shown
+ * Fixed workspace items â€” always in the sidebar, never activatable, not shown
  * on the Apps screen. These are the company's admin basics (like Odoo's base
  * Settings/Users): Apps, Team, Roles & Users, Settings.
  */
 export const WORKSPACE_PATHS = ['/apps', '/team', '/users', '/settings'];
 
-/** Apps shown on the Apps screen (everything except core), A→Z by name. */
+/** Apps shown on the Apps screen (everything except core), Aâ†’Z by name. */
 export const INSTALLABLE_APPS = APPS
   .filter((a) => !a.core)
   .sort((a, b) => a.name.localeCompare(b.name));
@@ -225,7 +225,7 @@ export const INSTALLABLE_APPS = APPS
  */
 export const DEFAULT_ACTIVE_APP_IDS: string[] = [];
 
-/** All app ids — used to mark the Johnson Arabia demo as fully loaded. */
+/** All app ids â€” used to mark the Johnson Arabia demo as fully loaded. */
 export const ALL_APP_IDS = APPS.map((a) => a.id);
 
 const APP_BY_ID = Object.fromEntries(APPS.map((a) => [a.id, a]));
@@ -253,9 +253,9 @@ export function dependentsOf(id: string, activeIds: string[]): string[] {
 
 /**
  * Where to land given the company's active apps:
- *  - no apps active        → the Apps screen
- *  - Dashboard active       → the Dashboard ('/')
- *  - otherwise              → the first activated app's landing page
+ *  - no apps active        â†’ the Apps screen
+ *  - Dashboard active       â†’ the Dashboard ('/')
+ *  - otherwise              â†’ the first activated app's landing page
  * Apps appear in registry order, so "first activated" follows that order.
  */
 export function landingPathForActiveApps(activeIds: string[]): string {

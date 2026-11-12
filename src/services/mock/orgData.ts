@@ -1,10 +1,12 @@
-import type {
+﻿import type {
   Machine, Branch, Customer, Booking, WorkshopJob, Technician, WorkshopBay,
   Driver, Truck, TransportJob, Inspection, Breakdown, JobCard, User,
   AppNotification, GateEntry,
 } from '@/types';
 import type { CrossHire } from '@/types/crosshire';
 import type { CustomerANI } from '@/types/customerani';
+import type { HireAgreement } from '@/types/hireagreement';
+import { hireAgreements as demoHireAgreements } from './hireagreement';
 import { JA_ORG_ID } from '@/store/orgStore';
 import demo from './johnsonArabiaDemo.json';
 import { customerANIs as demoCustomerANIs } from './customerani';
@@ -14,7 +16,7 @@ import { customerANIs as demoCustomerANIs } from './customerani';
  *
  * - Johnson Arabia (JA_ORG_ID) is the built-in demo company. ALL of its data
  *   lives in one static file: johnsonArabiaDemo.json.
- * - Every other (signed-up) company starts COMPLETELY EMPTY — no machines, no
+ * - Every other (signed-up) company starts COMPLETELY EMPTY â€” no machines, no
  *   bookings, no branches, nothing. The owner builds everything from scratch,
  *   like a fresh Odoo database.
  *
@@ -81,7 +83,7 @@ export const notificationsForOrg = (orgId: string) => collectionForOrg(orgId, 'n
 // until the owner creates them.
 export const branchesForOrg = (orgId: string) => collectionForOrg(orgId, 'branches');
 
-// ── Customer ANI (independent dataset, not part of the JA demo JSON) ─────────
+// â”€â”€ Customer ANI (independent dataset, not part of the JA demo JSON) â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // JA org gets the full 20-record demo set; new orgs start empty.
 const customerANICache: Record<string, CustomerANI[]> = {};
 
@@ -90,4 +92,14 @@ export function customerANIsForOrg(orgId: string): CustomerANI[] {
     customerANICache[orgId] = orgId === JA_ORG_ID ? [...demoCustomerANIs] : [];
   }
   return customerANICache[orgId];
+}
+
+// ── Hire Agreements (independent dataset) ────────────────────────────────────
+const hireAgreementCache: Record<string, HireAgreement[]> = {};
+
+export function hireAgreementsForOrg(orgId: string): HireAgreement[] {
+  if (!hireAgreementCache[orgId]) {
+    hireAgreementCache[orgId] = orgId === JA_ORG_ID ? [...demoHireAgreements] : [];
+  }
+  return hireAgreementCache[orgId];
 }

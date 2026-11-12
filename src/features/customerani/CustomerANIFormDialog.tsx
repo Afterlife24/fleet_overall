@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -15,7 +15,10 @@ interface FormValues {
   customerName: string;
   customerId: string;
   trn: string;
+  attn: string;
+  email: string;
   address: string;
+  billingAddress: string;
   attl: number;
   contactNumber: string;
   branchName: string;
@@ -39,27 +42,22 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
     register, handleSubmit, reset, formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     defaultValues: {
-      customerName: '',
-      customerId: '',
-      trn: '',
-      address: '',
-      attl: 0,
-      contactNumber: '',
-      branchName: 'Head Office',
-      status: 'Active',
-      aniRavaliActive: false,
-      notes: '',
+      customerName: '', customerId: '', trn: '', attn: '', email: '',
+      address: '', billingAddress: '', attl: 0, contactNumber: '',
+      branchName: 'Head Office', status: 'Active', aniRavaliActive: false, notes: '',
     },
   });
 
-  // Populate form when editing
   useEffect(() => {
     if (open && editRecord) {
       reset({
         customerName: editRecord.customerName,
         customerId: editRecord.customerId,
         trn: editRecord.trn,
+        attn: editRecord.attn ?? '',
+        email: editRecord.email ?? '',
         address: editRecord.address,
+        billingAddress: editRecord.billingAddress ?? editRecord.address,
         attl: editRecord.attl,
         contactNumber: editRecord.contactNumber,
         branchName: editRecord.branchName,
@@ -69,9 +67,9 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
       });
     } else if (open && !editRecord) {
       reset({
-        customerName: '', customerId: '', trn: '', address: '',
-        attl: 0, contactNumber: '', branchName: 'Head Office',
-        status: 'Active', aniRavaliActive: false, notes: '',
+        customerName: '', customerId: '', trn: '', attn: '', email: '',
+        address: '', billingAddress: '', attl: 0, contactNumber: '',
+        branchName: 'Head Office', status: 'Active', aniRavaliActive: false, notes: '',
       });
     }
   }, [open, editRecord, reset]);
@@ -80,14 +78,14 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
     try {
       if (isEdit && editRecord) {
         await updateMutation.mutateAsync({ id: editRecord.id, data: values });
-        toastSuccess('Customer ANI record updated');
+        toastSuccess('Customer updated');
       } else {
         await createMutation.mutateAsync(values);
-        toastSuccess('Customer ANI record created');
+        toastSuccess('Customer created');
       }
       onClose();
     } catch {
-      toastError('Could not save record. Please try again.');
+      toastError('Could not save. Please try again.');
     }
   };
 
@@ -95,13 +93,12 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Customer ANI' : 'New Customer ANI'}</DialogTitle>
+          <DialogTitle>{isEdit ? 'Edit Customer' : 'New Customer'}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-            {/* Customer Name */}
             <div className="sm:col-span-2 space-y-1.5">
               <Label htmlFor="customerName">Customer Name <span className="text-rose-500">*</span></Label>
               <Input
@@ -113,17 +110,11 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
               {errors.customerName && <p className="text-xs text-rose-500">{errors.customerName.message}</p>}
             </div>
 
-            {/* Customer ID */}
             <div className="space-y-1.5">
               <Label htmlFor="customerId">Customer ID</Label>
-              <Input
-                id="customerId"
-                {...register('customerId')}
-                placeholder="e.g. AFE-1042"
-              />
+              <Input id="customerId" {...register('customerId')} placeholder="e.g. CUST-000125" />
             </div>
 
-            {/* TRN */}
             <div className="space-y-1.5">
               <Label htmlFor="trn">TRN (Tax Reg. No.) <span className="text-rose-500">*</span></Label>
               <Input
@@ -135,40 +126,31 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
               {errors.trn && <p className="text-xs text-rose-500">{errors.trn.message}</p>}
             </div>
 
-            {/* Contact Number */}
+            <div className="space-y-1.5">
+              <Label htmlFor="attn">Attention (Attn)</Label>
+              <Input id="attn" {...register('attn')} placeholder="e.g. Mr. Ahmed Khan" />
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="contactNumber">Contact Number</Label>
-              <Input
-                id="contactNumber"
-                {...register('contactNumber')}
-                placeholder="+971 50 1234567"
-              />
+              <Input id="contactNumber" {...register('contactNumber')} placeholder="+971 50 1234567" />
             </div>
 
-            {/* ATTL */}
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" {...register('email')} placeholder="accounts@company.com" />
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="attl">ATTL (Credit Limit AED)</Label>
-              <Input
-                id="attl"
-                type="number"
-                min={0}
-                step={1000}
-                {...register('attl', { valueAsNumber: true })}
-                placeholder="500000"
-              />
+              <Input id="attl" type="number" min={0} step={1000} {...register('attl', { valueAsNumber: true })} placeholder="500000" />
             </div>
 
-            {/* Branch */}
             <div className="space-y-1.5">
               <Label htmlFor="branchName">Branch</Label>
-              <Input
-                id="branchName"
-                {...register('branchName')}
-                placeholder="Dubai HQ"
-              />
+              <Input id="branchName" {...register('branchName')} placeholder="Dubai HQ" />
             </div>
 
-            {/* Status */}
             <div className="space-y-1.5">
               <Label htmlFor="status">Status</Label>
               <select
@@ -182,9 +164,8 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
               </select>
             </div>
 
-            {/* ANI Ravali */}
             <div className="space-y-1.5">
-              <Label htmlFor="aniRavaliActive">ANI Ravali Activation</Label>
+              <Label htmlFor="aniRavaliActive">ANI Ravali</Label>
               <select
                 id="aniRavaliActive"
                 {...register('aniRavaliActive', { setValueAs: (v) => v === 'true' || v === true })}
@@ -195,23 +176,22 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
               </select>
             </div>
 
-            {/* Address */}
             <div className="sm:col-span-2 space-y-1.5">
               <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                {...register('address')}
-                placeholder="e.g. 42 Sheikh Zayed Rd, Dubai, UAE"
-              />
+              <Input id="address" {...register('address')} placeholder="e.g. 42 Sheikh Zayed Rd, Dubai, UAE" />
             </div>
 
-            {/* Notes */}
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label htmlFor="billingAddress">Billing Address</Label>
+              <Input id="billingAddress" {...register('billingAddress')} placeholder="Same as address if not different" />
+            </div>
+
             <div className="sm:col-span-2 space-y-1.5">
               <Label htmlFor="notes">Notes</Label>
               <textarea
                 id="notes"
                 {...register('notes')}
-                rows={3}
+                rows={2}
                 placeholder="Optional notes…"
                 className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />

@@ -1,19 +1,15 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/store/authStore';
 import { useOrgStore } from '@/store/orgStore';
 import { toastSuccess } from '@/lib/toast-helper';
 import { cn } from '@/lib/utils';
 import { Building2, Bell, Copy } from 'lucide-react';
 
-// Genuine workspace preferences — company profile + notifications.
-// Domain configuration lives where it belongs now:
-//   • Branches  → the Branches app
-//   • Roles & app access → the Team page
-//   • Machine categories / types / status codes → the Fleet app
 const NOTIF_SETTINGS = [
   { label: 'Breakdown alerts', desc: 'Get notified when a machine breaks down', defaultEnabled: true, category: 'Breakdown' },
   { label: 'Inspection reminders', desc: 'Reminders for upcoming and overdue inspections', defaultEnabled: true, category: 'Inspection' },
@@ -27,10 +23,17 @@ const NOTIF_SETTINGS = [
 export function SettingsPage() {
   const user = useAuthStore((s) => s.user);
   const getOrg = useOrgStore((s) => s.getOrg);
+  const updateOrgProfile = useOrgStore((s) => s.updateOrgProfile);
   const org = user ? getOrg(user.orgId) : undefined;
   const isOwner = !!user && (user.isOwner || user.role === 'Managing Director' || user.role === 'Executive Manager');
 
   const [companyName, setCompanyName] = useState(org?.name ?? user?.orgName ?? '');
+  const [tradeLicense, setTradeLicense] = useState(org?.tradeLicense ?? '');
+  const [companyTrn, setCompanyTrn] = useState(org?.companyTrn ?? '');
+  const [companyAddress, setCompanyAddress] = useState(org?.companyAddress ?? '');
+  const [companyPhone, setCompanyPhone] = useState(org?.companyPhone ?? '');
+  const [companyEmail, setCompanyEmail] = useState(org?.companyEmail ?? '');
+
   const [notifStates, setNotifStates] = useState<Record<string, boolean>>(
     Object.fromEntries(NOTIF_SETTINGS.map((s) => [s.label, s.defaultEnabled]))
   );
@@ -42,11 +45,23 @@ export function SettingsPage() {
     }
   };
 
+  const saveProfile = () => {
+    if (!user) return;
+    updateOrgProfile(user.orgId, {
+      name: companyName,
+      tradeLicense,
+      companyTrn,
+      companyAddress,
+      companyPhone,
+      companyEmail,
+    });
+    toastSuccess('Company profile saved');
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader title="Settings" description="Company profile and notification preferences" />
 
-      {/* Company profile */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -55,30 +70,56 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Company name</label>
+              <Label>Company name</Label>
               <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={!isOwner} />
             </div>
+
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Company code</label>
+              <Label>Company code</Label>
               <div className="flex items-center gap-2">
                 <Input value={org?.code ?? '—'} readOnly className="font-mono" />
                 <Button type="button" variant="outline" size="sm" onClick={copyCode}><Copy className="h-4 w-4" /></Button>
               </div>
             </div>
-          </div>
-          {isOwner && (
-            <div className="flex justify-end">
-              <Button size="sm" onClick={() => toastSuccess('Company profile saved')}>Save changes</Button>
+
+            <div className="space-y-1.5">
+              <Label>Trade License No.</Label>
+              <Input value={tradeLicense} onChange={(e) => setTradeLicense(e.target.value)} disabled={!isOwner} placeholder="e.g. JA-TL-2024-001" />
             </div>
-          )}
-          {!isOwner && (
+
+            <div className="space-y-1.5">
+              <Label>VAT Registration No. (TRN)</Label>
+              <Input value={companyTrn} onChange={(e) => setCompanyTrn(e.target.value)} disabled={!isOwner} placeholder="e.g. 100234567800003" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Company Phone</Label>
+              <Input value={companyPhone} onChange={(e) => setCompanyPhone(e.target.value)} disabled={!isOwner} placeholder="+971 4 123 4567" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Company Email</Label>
+              <Input type="email" value={companyEmail} onChange={(e) => setCompanyEmail(e.target.value)} disabled={!isOwner} placeholder="info@company.com" />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label>Company Address</Label>
+              <Input value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} disabled={!isOwner} placeholder="e.g. Office 1204, Business Centre, Dubai, UAE" />
+            </div>
+          </div>
+
+          {isOwner ? (
+            <div className="flex justify-end">
+              <Button size="sm" onClick={saveProfile}>Save changes</Button>
+            </div>
+          ) : (
             <p className="text-xs text-muted-foreground">Only the company owner can edit the profile.</p>
           )}
         </CardContent>
       </Card>
 
-      {/* Notification preferences */}
       <Card className="p-0">
         <CardHeader className="pb-0 pt-5 px-5">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -99,19 +140,23 @@ export function SettingsPage() {
                 </div>
                 <button
                   onClick={() => setNotifStates((prev) => ({ ...prev, [setting.label]: !enabled }))}
-                  className={cn('relative h-6 w-11 shrink-0 rounded-full transition-colors', enabled ? 'bg-primary' : 'bg-muted')}
+                  className={cn(
+                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+                    enabled ? 'bg-primary' : 'bg-muted-foreground/30'
+                  )}
                 >
-                  <span className={cn('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform', enabled ? 'translate-x-[22px]' : 'translate-x-0.5')} />
+                  <span
+                    className={cn(
+                      'pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform',
+                      enabled ? 'translate-x-4' : 'translate-x-0'
+                    )}
+                  />
                 </button>
               </div>
             );
           })}
         </div>
       </Card>
-
-      <p className="text-xs text-muted-foreground">
-        Branches are managed in the <span className="font-medium text-foreground">Branches</span> app · roles and member access in <span className="font-medium text-foreground">Team</span> · machine categories and status codes in the <span className="font-medium text-foreground">Fleet</span> app.
-      </p>
     </div>
   );
 }

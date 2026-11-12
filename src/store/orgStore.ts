@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserRole } from './authStore';
 import {
@@ -10,7 +10,7 @@ import type { FieldDef } from '@/types/schema';
 /**
  * Multi-tenant org layer (Odoo-style, frontend demo).
  *
- * - A company OWNER signs up → creates an Organization + their admin account.
+ * - A company OWNER signs up â†’ creates an Organization + their admin account.
  * - The owner creates MEMBERS inside the app, each with a department/role.
  * - Everyone logs in on the SAME login page; the app resolves their org + role.
  * - Each org's data is isolated by `orgId`.
@@ -26,7 +26,7 @@ export interface OrgAccount {
   orgName: string;
   name: string;
   email: string;
-  password: string;      // demo only — plain text
+  password: string;      // demo only â€” plain text
   role: UserRole;
   branchName: string;
   avatarColor: string;
@@ -41,6 +41,11 @@ export interface Organization {
   ownerEmail: string;
   seeded: boolean;       // true for the built-in Johnson Arabia demo org
   createdAt: string;
+  tradeLicense?: string;
+  companyTrn?: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  companyEmail?: string;
 }
 
 // The built-in demo org. Johnson Arabia's existing demo accounts belong here.
@@ -54,6 +59,11 @@ export const johnsonArabiaOrg: Organization = {
   ownerEmail: 'md@johnsonarabia.com',
   seeded: true,
   createdAt: '2025-01-01T00:00:00.000Z',
+  tradeLicense: 'JA-TL-2024-001',
+  companyTrn: '100234567800003',
+  companyAddress: 'Office 1204, Business Centre, Dubai, UAE',
+  companyPhone: '+971 4 123 4567',
+  companyEmail: 'info@johnsonarabia.com',
 };
 
 const AVATAR_COLORS = ['#0ea5e9', '#6366f1', '#10b981', '#f97316', '#f59e0b', '#84cc16', '#ec4899', '#14b8a6', '#a855f7', '#06b6d4', '#eab308'];
@@ -99,13 +109,13 @@ interface OrgState {
   getOrg: (orgId: string) => Organization | undefined;
   membersOf: (orgId: string) => OrgAccount[];
 
-  // ── Apps ──
+  // â”€â”€ Apps â”€â”€
   getActiveApps: (orgId: string) => string[];
   isAppActive: (orgId: string, appId: string) => boolean;
   activateApp: (orgId: string, appId: string) => void;
   deactivateApp: (orgId: string, appId: string) => { success: boolean; error?: string };
 
-  // ── Role → app access (per org) ──
+  // â”€â”€ Role â†’ app access (per org) â”€â”€
   // Which apps each role may open. Undefined for a role = all active apps
   // (owner hasn't restricted it yet). Owners/MD always see everything.
   roleApps: Record<string, Record<string, string[]>>; // orgId -> role -> appIds
@@ -113,20 +123,21 @@ interface OrgState {
   setRoleApps: (orgId: string, role: UserRole, appIds: string[]) => void;
   roleCanAccessApp: (orgId: string, role: UserRole, appId: string, isOwner: boolean) => boolean;
 
-  // ── App onboarding ("choose your setup") ──
+  // â”€â”€ App onboarding ("choose your setup") â”€â”€
   // Tracks which app a company has already set up, so the preset screen shows
   // only once per app. Key = `${orgId}:${appId}`.
   onboardedApps: Record<string, boolean>;
   isAppOnboarded: (orgId: string, appId: string) => boolean;
   markAppOnboarded: (orgId: string, appId: string) => void;
 
-  // ── Customizable field schemas (mini Studio) ──
+  // â”€â”€ Customizable field schemas (mini Studio) â”€â”€
   // Per org per app field schema. Key = `${orgId}:${appId}`. Undefined = use
   // the app's default schema.
   appSchemas: Record<string, FieldDef[]>;
   getAppSchema: (orgId: string, appId: string) => FieldDef[];
   setAppSchema: (orgId: string, appId: string, fields: FieldDef[]) => void;
   resetAppSchema: (orgId: string, appId: string) => void;
+  updateOrgProfile: (orgId: string, data: Partial<Pick<Organization, 'name' | 'tradeLicense' | 'companyTrn' | 'companyAddress' | 'companyPhone' | 'companyEmail'>>) => void;
 }
 
 // Johnson Arabia (the demo org) has every app on; a new company gets the
@@ -251,7 +262,7 @@ export const useOrgStore = create<OrgState>()(
 
       membersOf: (orgId) => get().accounts.filter((a) => a.orgId === orgId),
 
-      // ── Apps ──────────────────────────────────────────────────────
+      // â”€â”€ Apps â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       getActiveApps: (orgId) => {
         const stored = get().installedApps[orgId];
         return stored ?? defaultAppsFor(orgId);
@@ -277,7 +288,7 @@ export const useOrgStore = create<OrgState>()(
         const app = getApp(appId);
         if (app?.core) return { success: false, error: 'Core apps cannot be deactivated' };
         const current = get().getActiveApps(orgId);
-        // No dependency sequence on deactivation — any app can be turned off
+        // No dependency sequence on deactivation â€” any app can be turned off
         // independently, regardless of what else is active.
         // Clearing the onboarded flag means reactivating later re-shows the
         // setup choice ("load previous data" vs "start fresh").
@@ -292,7 +303,7 @@ export const useOrgStore = create<OrgState>()(
         return { success: true };
       },
 
-      // ── Role → app access ─────────────────────────────────────────
+      // â”€â”€ Role â†’ app access â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       getRoleApps: (orgId, role) => get().roleApps[orgId]?.[role],
 
       setRoleApps: (orgId, role, appIds) => {
@@ -312,14 +323,14 @@ export const useOrgStore = create<OrgState>()(
         // No explicit assignment:
         //  - Johnson Arabia demo (JA_ORG_ID): keep permissive (all active apps)
         //    so the demo accounts still show their pages.
-        //  - A signed-up company: strict — the employee sees nothing until the
+        //  - A signed-up company: strict â€” the employee sees nothing until the
         //    owner assigns apps to their role on the Team page.
         return orgId === JA_ORG_ID;
       },
 
-      // ── App onboarding ────────────────────────────────────────────
+      // â”€â”€ App onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       isAppOnboarded: (orgId, appId) => {
-        // Johnson Arabia already has data everywhere — never show onboarding.
+        // Johnson Arabia already has data everywhere â€” never show onboarding.
         if (orgId === JA_ORG_ID) return true;
         return !!get().onboardedApps[`${orgId}:${appId}`];
       },
@@ -327,7 +338,7 @@ export const useOrgStore = create<OrgState>()(
         set((s) => ({ onboardedApps: { ...s.onboardedApps, [`${orgId}:${appId}`]: true } }));
       },
 
-      // ── Customizable schemas ──────────────────────────────────────
+      // â”€â”€ Customizable schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       getAppSchema: (orgId, appId) => {
         const custom = get().appSchemas[`${orgId}:${appId}`];
         return custom ?? defaultSchema(appId);
@@ -342,6 +353,12 @@ export const useOrgStore = create<OrgState>()(
           return { appSchemas: next };
         });
       },
+
+      updateOrgProfile: (orgId, data) => {
+        set((s) => ({
+          organizations: s.organizations.map((o) => o.id === orgId ? { ...o, ...data } : o),
+        }));
+      },
     }),
     { name: 'fleet-orgs-v2' }
   )
@@ -354,7 +371,7 @@ function emailExists(normEmail: string, accounts: OrgAccount[]): boolean {
   return JA_DEMO_EMAILS.has(normEmail);
 }
 
-// Kept in sync with demoAccounts in authStore — the built-in J.A. demo logins.
+// Kept in sync with demoAccounts in authStore â€” the built-in J.A. demo logins.
 const JA_DEMO_EMAILS = new Set<string>([
   'md@johnsonarabia.com',
   'exec@johnsonarabia.com',

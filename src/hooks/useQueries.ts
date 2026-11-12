@@ -1,9 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   machineService, bookingService, workshopService, transportService,
   inspectionService, breakdownService, jobCardService, userService,
   notificationService, branchService, customerService, dashboardService, reportService, gateService,
-  sixSigmaService, crossHireService, customerANIService,
+  sixSigmaService, crossHireService, customerANIService, hireAgreementService,
 } from '@/services/services';
 import { useBranchStore } from '@/store/branchStore';
 
@@ -43,6 +43,8 @@ export const queryKeys = {
   crossHire: (id: string) => ['cross-hire', id] as const,
   crossHireStats: (branchId: string) => ['cross-hire-stats', branchId] as const,
   customerANIs: ['customer-anis'] as const,
+  hireAgreements: ['hire-agreements'] as const,
+  hireAgreement: (id: string) => ['hire-agreement', id] as const,
   customerANI: (id: string) => ['customer-ani', id] as const,
 };
 
@@ -171,11 +173,11 @@ export function useBreakdownReport() {
   return useQuery({ queryKey: queryKeys.breakdownReport, queryFn: reportService.getBreakdownReport });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // MUTATION HOOKS
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-// ── Machine Mutations ──────────────────────────────────────────────────────
+// â”€â”€ Machine Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateMachine() {
   const queryClient = useQueryClient();
@@ -225,7 +227,7 @@ export function useDeleteMachine() {
   });
 }
 
-// ── Booking Mutations ──────────────────────────────────────────────────────
+// â”€â”€ Booking Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateBooking() {
   const queryClient = useQueryClient();
@@ -269,7 +271,7 @@ export function useDeleteBooking() {
   });
 }
 
-// ── Workshop Mutations ─────────────────────────────────────────────────────
+// â”€â”€ Workshop Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateWorkshopJob() {
   const queryClient = useQueryClient();
@@ -315,7 +317,7 @@ export function useAssignTechnician() {
   });
 }
 
-// ── Breakdown Mutations ────────────────────────────────────────────────────
+// â”€â”€ Breakdown Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateBreakdown() {
   const queryClient = useQueryClient();
@@ -361,7 +363,7 @@ export function useAssignBreakdownTechnician() {
   });
 }
 
-// ── Inspection Mutations ───────────────────────────────────────────────────
+// â”€â”€ Inspection Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useUpdateInspection() {
   const queryClient = useQueryClient();
@@ -394,7 +396,7 @@ export function useSubmitInspection() {
   });
 }
 
-// ── Gate Mutations ─────────────────────────────────────────────────────────
+// â”€â”€ Gate Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useApproveGateEntry() {
   const queryClient = useQueryClient();
@@ -417,7 +419,7 @@ export function useCompleteGateEntry() {
   });
 }
 
-// ── User Mutations ─────────────────────────────────────────────────────────
+// â”€â”€ User Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateUser() {
   const queryClient = useQueryClient();
@@ -449,7 +451,7 @@ export function useDeleteUser() {
   });
 }
 
-// ── Gate Entry Mutations (Create) ─────────────────────────────────────────
+// â”€â”€ Gate Entry Mutations (Create) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateGateEntry() {
   const queryClient = useQueryClient();
@@ -462,7 +464,7 @@ export function useCreateGateEntry() {
   });
 }
 
-// ── Transport Job Mutations ────────────────────────────────────────────────
+// â”€â”€ Transport Job Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateTransportJob() {
   const queryClient = useQueryClient();
@@ -496,7 +498,7 @@ export function useUpdateTransportJobStatus() {
   });
 }
 
-// ── Job Card Mutations ─────────────────────────────────────────────────────
+// â”€â”€ Job Card Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateJobCard() {
   const queryClient = useQueryClient();
@@ -520,7 +522,7 @@ export function useUpdateJobCard() {
   });
 }
 
-// ── Inspection Create Mutations ────────────────────────────────────────────
+// â”€â”€ Inspection Create Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreatePHIInspection() {
   const queryClient = useQueryClient();
@@ -568,7 +570,7 @@ export function useCreateMQD() {
   });
 }
 
-// ── Cross Hire ─────────────────────────────────────────────────────────────
+// â”€â”€ Cross Hire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCrossHires() {
   return useQuery({ queryKey: queryKeys.crossHires, queryFn: crossHireService.list });
@@ -623,7 +625,7 @@ export function useSixSigmaMetrics() {
   });
 }
 
-// ── Customer ANI ───────────────────────────────────────────────────────────
+// â”€â”€ Customer ANI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCustomerANIs() {
   return useQuery({ queryKey: queryKeys.customerANIs, queryFn: customerANIService.list });
@@ -664,5 +666,43 @@ export function useDeleteCustomerANI() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.customerANIs });
     },
+  });
+}
+
+// ── Hire Agreement ─────────────────────────────────────────────────────────
+
+export function useHireAgreements() {
+  return useQuery({ queryKey: queryKeys.hireAgreements, queryFn: hireAgreementService.list });
+}
+
+export function useHireAgreement(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.hireAgreement(id || ''),
+    queryFn: () => hireAgreementService.get(id!),
+    enabled: !!id,
+  });
+}
+
+export function useCreateHireAgreement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => hireAgreementService.create(data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.hireAgreements }); },
+  });
+}
+
+export function useUpdateHireAgreement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => hireAgreementService.update(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.hireAgreements }); },
+  });
+}
+
+export function useDeleteHireAgreement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => hireAgreementService.delete(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.hireAgreements }); },
   });
 }

@@ -1,4 +1,4 @@
-export * from './common';
+﻿export * from './common';
 export * from './branch';
 export * from './machine';
 export * from './customer';
@@ -13,3 +13,4 @@ export * from './jobcard';
 export * from './report';
 export * from './gate';
 export * from './customerani';
+export * from './hireagreement';

@@ -1,4 +1,4 @@
-// Re-export all mock data from a single index for the service layer
+﻿// Re-export all mock data from a single index for the service layer
 export { branches, getBranchById } from './branches';
 export { customers, getCustomerById } from './customers';
 export { machines, getMachineById, getMachineByAsset } from './machines';
@@ -13,3 +13,5 @@ export { notifications } from './notifications';
 export { gateEntries } from './gate';
 export { crossHires, getCrossHireById } from './crosshire';
 export { customerANIs, getCustomerANIById } from './customerani';
+
+export { hireAgreements, getHireAgreementById } from './hireagreement';

@@ -1,7 +1,7 @@
-// Service abstraction layer.
+﻿// Service abstraction layer.
 //
 // Each function in here returns a Promise that resolves to mock data.
-// In Phase 2, replace the body of each function with a `fetch()` call —
+// In Phase 2, replace the body of each function with a `fetch()` call â€”
 // the signatures stay the same, so no page component needs to change.
 
 import {
@@ -14,13 +14,14 @@ import {
 } from './mock';
 import { CrossHire } from '@/types/crosshire';
 import type { CustomerANI } from '@/types/customerani';
+import type { HireAgreement } from '@/types/hireagreement';
 import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
 import {
   machinesForOrg, crossHiresForOrg, bookingsForOrg, workshopJobsForOrg,
   transportJobsForOrg, inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
   gateEntriesForOrg, customersForOrg, branchesForOrg,
   techniciansForOrg, workshopBaysForOrg, driversForOrg, trucksForOrg,
-  usersForOrg, notificationsForOrg, customerANIsForOrg,
+  usersForOrg, notificationsForOrg, customerANIsForOrg, hireAgreementsForOrg,
 } from './mock/orgData';
 
 // Current tenant from the auth session (demo: read straight from the store).
@@ -450,7 +451,7 @@ export const gateService = {
   },
 };
 
-// ── Cross Hire (sub-hire / re-hire) ─────────────────────────────────────────
+// â”€â”€ Cross Hire (sub-hire / re-hire) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Normalise a per-period rate to a monthly equivalent so Day/Week/Month deals
 // can be summed into one comparable revenue figure (~30d month, ~4.33 wk/mo).
@@ -551,7 +552,7 @@ export const crossHireService = {
   },
 };
 
-// ── App onboarding (preset seeding) ─────────────────────────────────────────
+// â”€â”€ App onboarding (preset seeding) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // Applies a "choose your setup" preset by creating its declarative records
 // through the normal create services (so the data lands in the current org,
@@ -560,7 +561,7 @@ export const crossHireService = {
 
 import { presetsForApp, type AppPreset } from '@/constants/appPresets';
 
-// ── Customer ANI service ───────────────────────────────────────────────────
+// â”€â”€ Customer ANI service â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const customerANIService = {
   list: () => delay(customerANIsForOrg(currentOrgId())),
@@ -603,7 +604,7 @@ export const customerANIService = {
   },
 };
 
-// Which collections each app "owns" — used when clearing an app's data on a
+// Which collections each app "owns" â€” used when clearing an app's data on a
 // "start fresh" reactivation. Backend: this maps to deleting the app's rows.
 const APP_COLLECTIONS: Record<string, Array<'machines' | 'crossHires' | 'branches' | 'customerANIs'>> = {
   fleet: ['machines'],
@@ -663,7 +664,7 @@ export const onboardingService = {
   },
 };
 
-// ── Six Sigma metrics ──────────────────────────────────────────────────────
+// â”€â”€ Six Sigma metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const sixSigmaService = {
   async getMetrics(branchId?: string) {
@@ -683,10 +684,10 @@ export const sixSigmaService = {
   },
 };
 
-// ── Dashboard aggregates ──────────────────────────────────────────────────
+// â”€â”€ Dashboard aggregates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Resolve which branch IDs a dashboard scope covers.
-// 'all' → every branch; 'uae' → all UAE branches (excl. KSA); otherwise the single branch.
+// 'all' â†’ every branch; 'uae' â†’ all UAE branches (excl. KSA); otherwise the single branch.
 function branchScopeIds(branchId?: string): string[] | null {
   if (!branchId || branchId === 'all') return null; // null = no filtering
   if (branchId === 'uae') return branches.filter((b) => b.country === 'UAE').map((b) => b.id);
@@ -800,7 +801,7 @@ export const dashboardService = {
   },
 };
 
-// ── Report aggregates ───────────────────────────────────────────────────
+// â”€â”€ Report aggregates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
   const org = currentOrgId();
@@ -911,5 +912,53 @@ export const reportService = {
       avgDowntime: Math.round((breakdowns.filter((b) => b.downtimeHours).reduce((s, b) => s + (b.downtimeHours || 0), 0) / Math.max(breakdowns.filter((b) => b.downtimeHours).length, 1)) * 10) / 10,
       openCases: breakdowns.filter((b) => b.status === 'Open' || b.status === 'In Progress').length,
     });
+  },
+};
+
+// -- Hire Agreement service --------------------------------------------------
+
+export const hireAgreementService = {
+  list: () => delay(hireAgreementsForOrg(currentOrgId())),
+  get: (id: string) => delay(hireAgreementsForOrg(currentOrgId()).find((h) => h.id === id)),
+  create: (data: Partial<import('@/types/hireagreement').HireAgreement>) => {
+    const list = hireAgreementsForOrg(currentOrgId());
+    const seq = list.length + 1;
+    const year = new Date().getFullYear();
+    const newRecord = {
+      id: 'ha-' + Date.now(),
+      agreementNo: 'HA-' + year + '-' + String(seq).padStart(3, '0'),
+      date: new Date().toISOString().slice(0, 10),
+      status: 'Draft',
+      lessorName: '', lessorTradeLicense: '', lessorTrn: '',
+      lessorAddress: '', lessorPhone: '', lessorEmail: '',
+      customerId: '', customerName: '', customerTrn: '',
+      attn: '', contactPerson: '', contactNumber: '',
+      customerEmail: '', billingAddress: '',
+      equipmentName: '', equipmentModel: '', serialNumber: '',
+      quantity: 1, capacity: '', workingHeight: '',
+      deliveryLocation: '', hireStartDate: '', hireEndDate: '', hireDuration: '',
+      monthlyRental: 0, transportationCharges: 0, subtotal: 0,
+      vat: 0, totalAmount: 0, paymentTerms: '30 Days',
+      securityDeposit: 0, paymentMethod: 'Bank Transfer',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...data,
+    };
+    list.push(newRecord as any);
+    return delay(newRecord);
+  },
+  update: (id: string, data: any) => {
+    const list = hireAgreementsForOrg(currentOrgId());
+    const index = list.findIndex((h) => h.id === id);
+    if (index === -1) throw new Error('Hire agreement not found');
+    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
+    return delay(list[index]);
+  },
+  delete: (id: string) => {
+    const list = hireAgreementsForOrg(currentOrgId());
+    const index = list.findIndex((h) => h.id === id);
+    if (index === -1) throw new Error('Hire agreement not found');
+    list.splice(index, 1);
+    return delay({ success: true });
   },
 };

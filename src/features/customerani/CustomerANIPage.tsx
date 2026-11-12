@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { KPICard } from '@/components/common/KPICard';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -15,8 +15,7 @@ import { formatCurrency } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { CustomerANIFormDialog } from './CustomerANIFormDialog';
 import {
-  Plus, Users2, Download, Filter, CheckCircle2, XCircle,
-  WifiHigh, Building2, CreditCard, Phone,
+  Plus, Users2, Download, Filter, WifiHigh, Building2, CreditCard,
 } from 'lucide-react';
 import { toastSuccess } from '@/lib/toast-helper';
 
@@ -53,75 +52,44 @@ export function CustomerANIPage() {
     );
   }
 
-  // ── KPI aggregates ───────────────────────────────────────────────────────
   const all = (records ?? []) as CustomerANI[];
   const activeCount = all.filter((r) => r.status === 'Active').length;
   const aniEnabled = all.filter((r) => r.aniRavaliActive).length;
   const totalATTL = all.reduce((s, r) => s + (r.attl ?? 0), 0);
   const suspendedCount = all.filter((r) => r.status === 'Suspended').length;
 
-  // ── Table columns ────────────────────────────────────────────────────────
+  // ── Simplified 6-column table ─────────────────────────────────────────────
   const columns: Column<CustomerANI>[] = [
     {
-      key: 'fleetLogId', header: 'Fleet Log ID', sortable: true, width: '110px',
-      render: (r) => <span className="font-mono text-xs font-semibold text-foreground">{r.fleetLogId}</span>,
-    },
-    {
-      key: 'aniRavaliActive', header: 'ANI Ravali', sortable: true, sortAccessor: (r) => r.aniRavaliActive ? 1 : 0,
-      render: (r) => r.aniRavaliActive ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
-          <CheckCircle2 className="h-3 w-3" /> Active
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-          <XCircle className="h-3 w-3" /> Inactive
-        </span>
-      ),
-    },
-    {
       key: 'customerId', header: 'Customer ID', sortable: true,
-      render: (r) => <span className="font-mono text-xs text-muted-foreground">{r.customerId}</span>,
+      render: (r) => <span className="font-mono text-xs font-semibold text-foreground">{r.customerId}</span>,
     },
     {
       key: 'customerName', header: 'Customer Name', sortable: true,
-      render: (r) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-foreground">{r.customerName}</span>
-          <span className="text-xs text-muted-foreground">{r.branchName}</span>
-        </div>
-      ),
+      render: (r) => <span className="font-medium text-foreground">{r.customerName}</span>,
     },
     {
-      key: 'trn', header: 'TRN', sortable: true,
+      key: 'trn', header: 'TRN No.', sortable: true,
       render: (r) => <span className="font-mono text-xs text-foreground">{r.trn}</span>,
+    },
+    {
+      key: 'attn', header: 'ATTN',
+      render: (r) => <span className="text-sm text-muted-foreground">{r.attn ?? '—'}</span>,
     },
     {
       key: 'address', header: 'Address',
       render: (r) => (
-        <span className="max-w-[200px] truncate text-xs text-muted-foreground" title={r.address}>
+        <span className="max-w-[220px] truncate text-xs text-muted-foreground" title={r.address}>
           {r.address}
         </span>
       ),
     },
     {
-      key: 'attl', header: 'ATTL', sortable: true, sortAccessor: (r) => r.attl,
-      render: (r) => (
-        <span className="tabular-nums font-semibold text-foreground">
-          {formatCurrency(r.attl)}
-        </span>
-      ),
-    },
-    {
-      key: 'contactNumber', header: 'Contact Number',
+      key: 'contactNumber', header: 'Contact',
       render: (r) => <span className="text-xs tabular-nums">{r.contactNumber}</span>,
-    },
-    {
-      key: 'status', header: 'Status', sortable: true,
-      render: (r) => <StatusBadge status={r.status} size="sm" />,
     },
   ];
 
-  // ── Toggle ANI Ravali from the table row action ──────────────────────────
   const toggleANI = (record: CustomerANI) => {
     updateMutation.mutate(
       { id: record.id, data: { aniRavaliActive: !record.aniRavaliActive } },
@@ -139,8 +107,8 @@ export function CustomerANIPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Customer ANI"
-        description="Customer Account & Network Integration — manage Fleet Log entries, TRN, ATTL and ANI Ravali status"
+        title="Customers"
+        description="Manage customer master records — IDs, TRN, ATTL and contact details"
         actions={
           <>
             <Button variant="outline" size="sm">
@@ -153,7 +121,6 @@ export function CustomerANIPage() {
         }
       />
 
-      {/* ── KPIs ── */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard label="Active Customers" value={activeCount} icon={Users2} color="blue" />
         <KPICard label="ANI Ravali Active" value={aniEnabled} icon={WifiHigh} color="teal" />
@@ -161,7 +128,6 @@ export function CustomerANIPage() {
         <KPICard label="Suspended" value={suspendedCount} icon={Building2} color="red" />
       </div>
 
-      {/* ── Status filter ── */}
       <div className="flex flex-wrap items-center gap-2">
         <Filter className="h-4 w-4 text-muted-foreground" />
         <span className="text-xs font-medium text-muted-foreground">Status:</span>
@@ -184,7 +150,6 @@ export function CustomerANIPage() {
         <span className="ml-auto text-xs text-muted-foreground">{data.length} records</span>
       </div>
 
-      {/* ── Main table ── */}
       {isLoading ? (
         <LoadingState />
       ) : (
@@ -193,16 +158,15 @@ export function CustomerANIPage() {
           data={data}
           searchable
           searchPlaceholder="Search customers…"
-          searchKeys={['customerName', 'customerId', 'fleetLogId', 'trn', 'contactNumber', 'address']}
-          initialSort={{ key: 'fleetLogId', direction: 'asc' }}
+          searchKeys={['customerName', 'customerId', 'trn', 'contactNumber', 'address', 'attn']}
+          initialSort={{ key: 'customerId', direction: 'asc' }}
           onRowClick={setSelected}
           rowKey={(r) => r.id}
           pageSize={15}
-          emptyMessage="No customer ANI records found."
+          emptyMessage="No customers found."
         />
       )}
 
-      {/* ── Detail slide-over ── */}
       <SlideOver
         open={!!selected}
         onClose={() => setSelected(null)}
@@ -210,7 +174,6 @@ export function CustomerANIPage() {
       >
         {selected && (
           <div className="space-y-5">
-            {/* ANI Ravali activation toggle */}
             <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
               <div>
                 <p className="text-sm font-semibold text-foreground">ANI Ravali Status</p>
@@ -230,13 +193,14 @@ export function CustomerANIPage() {
               </Button>
             </div>
 
-            <SectionTitle>Fleet Log & Identity</SectionTitle>
+            <SectionTitle>Identity</SectionTitle>
             <InfoGrid>
-              <InfoRow label="Fleet Log ID" value={selected.fleetLogId} />
               <InfoRow label="Customer ID" value={selected.customerId} />
               <InfoRow label="Customer Name" value={selected.customerName} />
+              <InfoRow label="Fleet Log ID" value={selected.fleetLogId} />
               <InfoRow label="Status" value={<StatusBadge status={selected.status} size="sm" />} />
               <InfoRow label="Branch" value={selected.branchName} />
+              <InfoRow label="ATTN" value={selected.attn ?? '—'} />
             </InfoGrid>
 
             <SectionTitle>Tax & Financial</SectionTitle>
@@ -248,7 +212,9 @@ export function CustomerANIPage() {
             <SectionTitle>Contact & Location</SectionTitle>
             <InfoGrid>
               <InfoRow label="Contact Number" value={selected.contactNumber} />
+              <InfoRow label="Email" value={selected.email ?? '—'} />
               <InfoRow label="Address" value={selected.address} />
+              <InfoRow label="Billing Address" value={selected.billingAddress ?? selected.address} />
             </InfoGrid>
 
             {selected.notes && (
@@ -274,7 +240,7 @@ export function CustomerANIPage() {
                 className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
                 onClick={() => {
                   deleteMutation.mutate(selected.id, {
-                    onSuccess: () => { toastSuccess('Customer ANI record deleted'); setSelected(null); },
+                    onSuccess: () => { toastSuccess('Customer deleted'); setSelected(null); },
                   });
                 }}
               >
@@ -285,7 +251,6 @@ export function CustomerANIPage() {
         )}
       </SlideOver>
 
-      {/* ── Add / Edit dialog ── */}
       <CustomerANIFormDialog
         open={formOpen}
         onClose={() => { setFormOpen(false); setEditTarget(undefined); }}
