@@ -89,7 +89,7 @@ const customerANICache: Record<string, CustomerANI[]> = {};
 
 export function customerANIsForOrg(orgId: string): CustomerANI[] {
   if (!customerANICache[orgId]) {
-    customerANICache[orgId] = orgId === JA_ORG_ID ? [...demoCustomerANIs] : [];
+    customerANICache[orgId] = [...demoCustomerANIs]; // all orgs get the 5 demo customers
   }
   return customerANICache[orgId];
 }
@@ -99,7 +99,7 @@ const hireAgreementCache: Record<string, HireAgreement[]> = {};
 
 export function hireAgreementsForOrg(orgId: string): HireAgreement[] {
   if (!hireAgreementCache[orgId]) {
-    hireAgreementCache[orgId] = orgId === JA_ORG_ID ? [...demoHireAgreements] : [];
+    hireAgreementCache[orgId] = [...demoHireAgreements]; // all orgs get the 5 demo agreements
   }
   return hireAgreementCache[orgId];
 }
