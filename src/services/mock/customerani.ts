@@ -1,77 +1,102 @@
-﻿import type { CustomerANI, CustomerANIStatus } from '@/types/customerani';
-import { randInt, pick } from './_gen';
+﻿import type { CustomerANI } from '@/types/customerani';
 
-const COMPANIES = [
-  'Al Futtaim Engineering', 'Arabtec Construction LLC', 'Nakheel Properties',
-  'Emaar Developments', 'Al Naboodah Group', 'Aldar Properties PJSC',
-  'CCC Consolidated Contractors', 'Hyundai Engineering & Construction',
-  'Samsung C&T Middle East', 'Larsen & Toubro Gulf',
-  'Drake & Scull International', 'Dutco Balfour Beatty',
-  'Shapoorji Pallonji & Co', 'Al Habtoor Engineering', 'Bin Ladin Group ME',
-  'Multiplex Construction Gulf', 'Interserve Construction UAE',
-  'Wates Group MENA', 'Atkins Middle East', 'AECOM Gulf',
+/**
+ * 5 fixed demo customers.
+ * Customer IDs, names, TRNs, contacts and addresses are identical to the
+ * 5 hire agreements in hireagreement.ts so auto-fill works perfectly.
+ */
+export const customerANIs: CustomerANI[] = [
+  {
+    id: 'cani-1',
+    fleetLogId: 'FL-00001',
+    aniRavaliActive: true,
+    customerId: 'CUST-000125',
+    customerName: 'Al Futtaim Engineering LLC',
+    trn: '100412345600003',
+    attn: 'Mr. Ahmed Khan',
+    address: 'Al Futtaim Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
+    billingAddress: 'Al Futtaim Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
+    email: 'ahmed.khan@alfuttaim.com',
+    attl: 500000,
+    contactNumber: '+971 50 123 4567',
+    status: 'Active',
+    branchName: 'Dubai HQ',
+    createdAt: '2024-03-10T08:00:00.000Z',
+    updatedAt: '2025-01-15T10:30:00.000Z',
+  },
+  {
+    id: 'cani-2',
+    fleetLogId: 'FL-00002',
+    aniRavaliActive: true,
+    customerId: 'CUST-000248',
+    customerName: 'Arabtec Construction LLC',
+    trn: '100567890100003',
+    attn: 'Ms. Sara Ali',
+    address: 'Arabtec Tower, Airport Rd, Abu Dhabi, UAE',
+    billingAddress: 'Arabtec Tower, Airport Rd, Abu Dhabi, UAE',
+    email: 'sara.ali@arabtec.ae',
+    attl: 750000,
+    contactNumber: '+971 50 234 5678',
+    status: 'Active',
+    branchName: 'Abu Dhabi',
+    createdAt: '2024-05-20T09:15:00.000Z',
+    updatedAt: '2025-02-10T11:00:00.000Z',
+  },
+  {
+    id: 'cani-3',
+    fleetLogId: 'FL-00003',
+    aniRavaliActive: true,
+    customerId: 'CUST-000371',
+    customerName: 'Nakheel Properties PJSC',
+    trn: '100789012300003',
+    attn: 'Mr. John Smith',
+    address: 'Nakheel HQ, Palm Jumeirah, Dubai, UAE',
+    billingAddress: 'Nakheel HQ, Palm Jumeirah, Dubai, UAE',
+    email: 'john.smith@nakheel.ae',
+    attl: 900000,
+    contactNumber: '+971 50 345 6789',
+    status: 'Active',
+    branchName: 'Dubai HQ',
+    createdAt: '2024-07-05T07:30:00.000Z',
+    updatedAt: '2025-03-01T14:20:00.000Z',
+  },
+  {
+    id: 'cani-4',
+    fleetLogId: 'FL-00004',
+    aniRavaliActive: false,
+    customerId: 'CUST-000419',
+    customerName: 'Emaar Properties LLC',
+    trn: '100890123400003',
+    attn: 'Ms. Priya Nair',
+    address: 'Emaar Square, Downtown Dubai, UAE',
+    billingAddress: 'Emaar Square, Downtown Dubai, UAE',
+    email: 'priya.nair@emaar.ae',
+    attl: 1200000,
+    contactNumber: '+971 50 456 7890',
+    status: 'Active',
+    branchName: 'Dubai HQ',
+    createdAt: '2024-02-14T10:00:00.000Z',
+    updatedAt: '2025-01-28T09:45:00.000Z',
+  },
+  {
+    id: 'cani-5',
+    fleetLogId: 'FL-00005',
+    aniRavaliActive: true,
+    customerId: 'CUST-000532',
+    customerName: 'Al Naboodah Group LLC',
+    trn: '100901234500003',
+    attn: 'Mr. Mohammed Al Rashid',
+    address: 'Al Naboodah Centre, Al Qasimia, Sharjah, UAE',
+    billingAddress: 'Al Naboodah Centre, Al Qasimia, Sharjah, UAE',
+    email: 'mohammed.alrashid@alnaboodah.com',
+    attl: 650000,
+    contactNumber: '+971 50 567 8901',
+    status: 'Active',
+    branchName: 'Sharjah',
+    createdAt: '2024-08-18T08:45:00.000Z',
+    updatedAt: '2025-04-05T12:10:00.000Z',
+  },
 ];
-
-const ATTN_NAMES = [
-  'Mr. Ahmed Khan', 'Ms. Sara Ali', 'Mr. John Smith', 'Ms. Priya Nair',
-  'Mr. Mohammed Al Rashid', 'Ms. Fatima Al Zaabi', 'Mr. David Chen',
-  'Ms. Aisha Al Mansoori', 'Mr. Raj Sharma', 'Ms. Leila Hassan',
-];
-
-const BRANCHES = ['Dubai HQ', 'Abu Dhabi', 'Sharjah', 'Al Ain', 'Riyadh', 'Jeddah'];
-const STATUSES: CustomerANIStatus[] = ['Active', 'Active', 'Active', 'Inactive', 'Suspended'];
-
-function padId(n: number): string {
-  return `FL-${String(n).padStart(5, '0')}`;
-}
-
-function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString();
-}
-
-function makeCustomerANI(index: number): CustomerANI {
-  const name = COMPANIES[index % COMPANIES.length];
-  const branch = pick(BRANCHES);
-  const status = STATUSES[index % STATUSES.length];
-  const aniActive = status === 'Active';
-  const shortCode = name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 4);
-  const country = index % 4 === 0 ? 'KSA' : 'UAE';
-  const countryCode = country === 'KSA' ? '966' : '971';
-  const city = pick(['Dubai', 'Abu Dhabi', 'Riyadh', 'Jeddah', 'Sharjah', 'Al Ain']);
-  const trn = `1${randInt(10000000, 99999999)}00003`;
-  const attl = randInt(50, 950) * 1000;
-  const phone = `+${countryCode} ${randInt(50, 59)} ${randInt(1000000, 9999999)}`;
-  const street = pick(['Sheikh Zayed Rd', 'Al Khail Rd', 'Airport Rd', 'Corniche St', 'Business Bay Blvd']);
-  const addressLine = `${randInt(1, 999)} ${street}, ${city}, ${country}`;
-  const attn = pick(ATTN_NAMES);
-  const firstName = attn.split(' ').slice(-1)[0].toLowerCase();
-  const companySlug = name.split(' ')[0].toLowerCase().replace(/[^a-z]/g, '');
-  const email = `${firstName}@${companySlug}.com`;
-
-  return {
-    id: `cani-${index + 1}`,
-    fleetLogId: padId(index + 1),
-    aniRavaliActive: aniActive,
-    customerId: `${shortCode}-${randInt(1000, 9999)}`,
-    customerName: name,
-    trn,
-    attn,
-    address: addressLine,
-    billingAddress: addressLine,
-    email,
-    attl,
-    contactNumber: phone,
-    status,
-    branchName: branch,
-    notes: index % 5 === 0 ? 'VIP account — requires senior account manager sign-off.' : undefined,
-    createdAt: daysAgo(randInt(30, 730)),
-    updatedAt: daysAgo(randInt(1, 29)),
-  };
-}
-
-export const customerANIs: CustomerANI[] = Array.from({ length: 20 }, (_, i) => makeCustomerANI(i));
 
 export function getCustomerANIById(id: string): CustomerANI | undefined {
   return customerANIs.find((c) => c.id === id);

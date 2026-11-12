@@ -174,7 +174,7 @@ export const APPS: AppDef[] = [
 
   // â”€â”€ Management apps (each standalone) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   {
-    id: 'customer_ani', name: 'Customer ANI', summary: 'Customer account & network integration â€” Fleet Log, TRN, ATTL and ANI Ravali activation',
+    id: 'customer_ani', name: 'Customer', summary: 'Customer master records — IDs, TRN, ATTL and contact details',
     icon: Users2, category: 'Management', color: '#06b6d4',
     paths: ['/customer-ani'], labels: ['Customer'],
   },
