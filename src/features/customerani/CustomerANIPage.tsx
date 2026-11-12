@@ -123,7 +123,7 @@ export function CustomerANIPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard label="Active Customers" value={activeCount} icon={Users2} color="blue" />
-        <KPICard label="ANI Ravali Active" value={aniEnabled} icon={WifiHigh} color="teal" />
+        <KPICard label="Active" value={aniEnabled} icon={WifiHigh} color="teal" />
         <KPICard label="Total ATTL" value={formatCurrency(totalATTL)} icon={CreditCard} color="indigo" />
         <KPICard label="Suspended" value={suspendedCount} icon={Building2} color="red" />
       </div>
