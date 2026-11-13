@@ -3,7 +3,7 @@ import {
   machineService, bookingService, workshopService, transportService,
   inspectionService, breakdownService, jobCardService, userService,
   notificationService, branchService, customerService, dashboardService, reportService, gateService,
-  sixSigmaService, crossHireService, customerANIService, hireAgreementService,
+  sixSigmaService, crossHireService, customerANIService, hireAgreementService, taxInvoiceService,
 } from '@/services/services';
 import { useBranchStore } from '@/store/branchStore';
 
@@ -43,6 +43,7 @@ export const queryKeys = {
   crossHire: (id: string) => ['cross-hire', id] as const,
   crossHireStats: (branchId: string) => ['cross-hire-stats', branchId] as const,
   customerANIs: ['customer-anis'] as const,
+  taxInvoices: ['tax-invoices'] as const,
   hireAgreements: ['hire-agreements'] as const,
   hireAgreement: (id: string) => ['hire-agreement', id] as const,
   customerANI: (id: string) => ['customer-ani', id] as const,
@@ -704,5 +705,35 @@ export function useDeleteHireAgreement() {
   return useMutation({
     mutationFn: (id: string) => hireAgreementService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.hireAgreements }); },
+  });
+}
+
+// -- Tax Invoice -------------------------------------------------------------
+
+export function useTaxInvoices() {
+  return useQuery({ queryKey: queryKeys.taxInvoices, queryFn: taxInvoiceService.list });
+}
+
+export function useCreateTaxInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => taxInvoiceService.create(data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.taxInvoices }); },
+  });
+}
+
+export function useUpdateTaxInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => taxInvoiceService.update(id, data),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.taxInvoices }); },
+  });
+}
+
+export function useDeleteTaxInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => taxInvoiceService.delete(id),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.taxInvoices }); },
   });
 }

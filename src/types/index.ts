@@ -14,3 +14,4 @@ export * from './report';
 export * from './gate';
 export * from './customerani';
 export * from './hireagreement';
+export * from './taxinvoice';

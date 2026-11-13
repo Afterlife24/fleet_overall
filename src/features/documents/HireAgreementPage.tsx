@@ -315,17 +315,24 @@ export function HireAgreementPage() {
                 </tr>
               </thead>
               <tbody>
-                {[
-                  ['Company Name', f.lessorName || org?.name || '', 'lessorName'],
-                  ['Trade License No.', f.lessorTradeLicense || org?.tradeLicense || '', 'lessorTradeLicense'],
-                  ['VAT Registration No. (TRN)', f.lessorTrn || org?.companyTrn || '', 'lessorTrn'],
-                  ['Company Address', f.lessorAddress || org?.companyAddress || '', 'lessorAddress'],
-                  ['Contact', f.lessorPhone || org?.companyPhone || '', 'lessorPhone'],
-                  ['Email', f.lessorEmail || org?.companyEmail || '', 'lessorEmail'],
-                ].map(([label, val, fieldKey]) => (
-                  <tr key={fieldKey} className="even:bg-gray-50">
+                {([
+                  ['Company Name', 'lessorName', f.lessorName || org?.name || ''],
+                  ['Trade License No.', 'lessorTradeLicense', f.lessorTradeLicense || org?.tradeLicense || ''],
+                  ['VAT Registration No. (TRN)', 'lessorTrn', f.lessorTrn || org?.companyTrn || ''],
+                  ['Company Address', 'lessorAddress', f.lessorAddress || org?.companyAddress || ''],
+                  ['Contact', 'lessorPhone', f.lessorPhone || org?.companyPhone || ''],
+                  ['Email', 'lessorEmail', f.lessorEmail || org?.companyEmail || ''],
+                ] as [string, keyof HireAgreement, string][]).map(([label, key, placeholder]) => (
+                  <tr key={key} className="even:bg-gray-50">
                     <td className="border border-gray-200 px-3 py-1.5 font-medium">{label}</td>
-                    <td className="border border-gray-200 px-3 py-1.5 text-gray-700">{String(val)}</td>
+                    <td className="border border-gray-200 px-3 py-1.5">
+                      <input
+                        className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
+                        value={String(f[key] ?? '')}
+                        onChange={(e) => setField(key, e.target.value as any)}
+                        placeholder={placeholder || label}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>

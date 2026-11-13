@@ -21,7 +21,7 @@ import {
   transportJobsForOrg, inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
   gateEntriesForOrg, customersForOrg, branchesForOrg,
   techniciansForOrg, workshopBaysForOrg, driversForOrg, trucksForOrg,
-  usersForOrg, notificationsForOrg, customerANIsForOrg, hireAgreementsForOrg,
+  usersForOrg, notificationsForOrg, customerANIsForOrg, hireAgreementsForOrg, taxInvoicesForOrg,
 } from './mock/orgData';
 
 // Current tenant from the auth session (demo: read straight from the store).
@@ -958,6 +958,40 @@ export const hireAgreementService = {
     const list = hireAgreementsForOrg(currentOrgId());
     const index = list.findIndex((h) => h.id === id);
     if (index === -1) throw new Error('Hire agreement not found');
+    list.splice(index, 1);
+    return delay({ success: true });
+  },
+};
+
+// -- Tax Invoice service -----------------------------------------------------
+
+export const taxInvoiceService = {
+  list: () => delay(taxInvoicesForOrg(currentOrgId())),
+  get: (id: string) => delay(taxInvoicesForOrg(currentOrgId()).find((x) => x.id === id)),
+  create: (data: any) => {
+    const list = taxInvoicesForOrg(currentOrgId());
+    const rec = {
+      id: 'inv-' + Date.now(),
+      status: 'Draft',
+      currency: 'AED',
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    list.push(rec as any);
+    return delay(rec);
+  },
+  update: (id: string, data: any) => {
+    const list = taxInvoicesForOrg(currentOrgId());
+    const index = list.findIndex((x) => x.id === id);
+    if (index === -1) throw new Error('Invoice not found');
+    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
+    return delay(list[index]);
+  },
+  delete: (id: string) => {
+    const list = taxInvoicesForOrg(currentOrgId());
+    const index = list.findIndex((x) => x.id === id);
+    if (index === -1) throw new Error('Invoice not found');
     list.splice(index, 1);
     return delay({ success: true });
   },

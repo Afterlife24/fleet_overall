@@ -6,6 +6,8 @@
 import type { CrossHire } from '@/types/crosshire';
 import type { CustomerANI } from '@/types/customerani';
 import type { HireAgreement } from '@/types/hireagreement';
+import type { TaxInvoice } from '@/types/taxinvoice';
+import { taxInvoices as demoTaxInvoices } from './taxinvoice';
 import { hireAgreements as demoHireAgreements } from './hireagreement';
 import { JA_ORG_ID } from '@/store/orgStore';
 import demo from './johnsonArabiaDemo.json';
@@ -102,4 +104,14 @@ export function hireAgreementsForOrg(orgId: string): HireAgreement[] {
     hireAgreementCache[orgId] = [...demoHireAgreements]; // all orgs get the 5 demo agreements
   }
   return hireAgreementCache[orgId];
+}
+
+// -- Tax Invoices (independent dataset) -------------------------------------
+const taxInvoiceCache: Record<string, TaxInvoice[]> = {};
+
+export function taxInvoicesForOrg(orgId: string): TaxInvoice[] {
+  if (!taxInvoiceCache[orgId]) {
+    taxInvoiceCache[orgId] = [...demoTaxInvoices];
+  }
+  return taxInvoiceCache[orgId];
 }

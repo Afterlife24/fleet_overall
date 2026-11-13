@@ -39,6 +39,7 @@ const BranchesPage = lazy(() => import('@/features/branches/BranchesPage').then(
 const DocumentAppPage = lazy(() => import('@/features/documents/DocumentAppPage').then(m => ({ default: m.DocumentAppPage })));
 const NotFoundPage = lazy(() => import('@/features/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const CustomerANIPage = lazy(() => import('@/features/customerani/CustomerANIPage').then(m => ({ default: m.CustomerANIPage })));
+const InvoicePage = lazy(() => import('@/features/documents/InvoicePage').then(m => ({ default: m.InvoicePage })));
 const HireAgreementPage = lazy(() => import('@/features/documents/HireAgreementPage').then(m => ({ default: m.HireAgreementPage })));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -154,7 +155,7 @@ export function AppRouter() {
           <Route path="/docs/lpo" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="lpo" /></Suspense></AppGuard>} />
           <Route path="/docs/delivery-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="delivery_note" /></Suspense></AppGuard>} />
           <Route path="/docs/collection-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="collection_note" /></Suspense></AppGuard>} />
-          <Route path="/docs/invoice" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="invoice" /></Suspense></AppGuard>} />
+          <Route path="/docs/invoice" element={<AppGuard><Suspense fallback={<LoadingState />}><InvoicePage /></Suspense></AppGuard>} />
           <Route path="/docs/soa" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="soa" /></Suspense></AppGuard>} />
           <Route path="/docs/payment-receipt" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="payment_receipt" /></Suspense></AppGuard>} />
           <Route path="/customer-ani" element={<AppGuard><Suspense fallback={<LoadingState />}><CustomerANIPage /></Suspense></AppGuard>} />

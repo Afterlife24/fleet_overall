@@ -176,7 +176,7 @@ export function CustomerANIPage() {
           <div className="space-y-5">
             <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 p-4">
               <div>
-                <p className="text-sm font-semibold text-foreground">ANI Ravali Status</p>
+                <p className="text-sm font-semibold text-foreground">Status</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {selected.aniRavaliActive
                     ? 'Integration is currently active for this customer.'
@@ -189,7 +189,7 @@ export function CustomerANIPage() {
                 onClick={() => { toggleANI(selected); setSelected({ ...selected, aniRavaliActive: !selected.aniRavaliActive }); }}
                 className={cn(selected.aniRavaliActive && 'text-rose-600 hover:text-rose-700 dark:text-rose-400')}
               >
-                {selected.aniRavaliActive ? 'Deactivate ANI' : 'Activate ANI'}
+                {selected.aniRavaliActive ? 'Deactivate' : 'Activate'}
               </Button>
             </div>
 
