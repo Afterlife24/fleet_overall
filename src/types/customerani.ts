@@ -31,3 +31,6 @@ export interface CustomerANI {
   createdAt: string;
   updatedAt: string;
 }
+
+/** A Customer_Registry row: a Customer ANI record owned by one company. */
+export type CustomerRecord = CustomerANI & { orgId: string };

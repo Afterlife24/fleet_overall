@@ -4,7 +4,8 @@ import { DataTable, type Column } from '@/components/tables/DataTable';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { LoadingState, ErrorState } from '@/components/common/EmptyState';
-import { useHireAgreements, useCreateHireAgreement, useUpdateHireAgreement, useDeleteHireAgreement, useCustomerANIs } from '@/hooks/useQueries';
+import { useHireAgreements, useCreateHireAgreement, useUpdateHireAgreement, useDeleteHireAgreement, useCustomerANIs, useQuotationOptions } from '@/hooks/useQueries';
+import { HireLinkValidationError, HireAgreementInUseError } from '@/services/hireLink';
 import { useAuthStore } from '@/store/authStore';
 import { useOrgStore } from '@/store/orgStore';
 import type { HireAgreement } from '@/types/hireagreement';
@@ -12,6 +13,7 @@ import type { CustomerANI } from '@/types/customerani';
 import { cn } from '@/lib/utils';
 import { Plus, Download, ArrowLeft, FileText, Trash2 } from 'lucide-react';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
+
 
 function calcTotals(monthly: number, transport: number) {
   const subtotal = monthly + transport;
@@ -36,6 +38,7 @@ function emptyForm(org: { name?: string; tradeLicense?: string; companyTrn?: str
     lessorAddress: org?.companyAddress ?? '',
     lessorPhone: org?.companyPhone ?? '',
     lessorEmail: org?.companyEmail ?? '',
+    quotationId: '',
     customerId: '', customerName: '', customerTrn: '',
     attn: '', contactPerson: '', contactNumber: '',
     customerEmail: '', billingAddress: '',
@@ -77,6 +80,8 @@ export function HireAgreementPage() {
 
   // Form field state
   const [form, setForm] = useState<Partial<HireAgreement>>({});
+  const { data: quotationOptionsData } = useQuotationOptions(form.customerName ?? '');
+  const quotationOptions = quotationOptionsData ?? { active: true, options: [] };
 
   const openNew = () => {
     const seq = ((agreements as HireAgreement[] | undefined)?.length ?? 0) + 1;
@@ -159,8 +164,8 @@ export function HireAgreementPage() {
         toastSuccess('Agreement created');
       }
       setView('list');
-    } catch {
-      toastError('Could not save agreement');
+    } catch (err) {
+      toastError(err instanceof HireLinkValidationError ? err.message : 'Could not save agreement');
     }
   };
 
@@ -175,6 +180,9 @@ export function HireAgreementPage() {
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id, {
       onSuccess: () => toastSuccess('Agreement deleted'),
+      onError: (err) => {
+        toastError(err instanceof HireAgreementInUseError ? err.message : 'Could not delete agreement');
+      },
     });
   };
 
@@ -296,6 +304,22 @@ export function HireAgreementPage() {
                   onChange={(e) => setField('date', e.target.value)}
                 />
               </p>
+              <p className="mt-1 print:hidden"><span className="font-semibold">Quotation:</span>{' '}
+                <select
+                  className="border-b border-gray-300 bg-transparent text-xs w-48 focus:outline-none disabled:opacity-60"
+                  value={f.quotationId ?? ''}
+                  disabled={!quotationOptions.active}
+                  onChange={(e) => setField('quotationId', e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {quotationOptions.options.map((q) => (
+                    <option key={q.id} value={q.id}>{q.number} · {q.opportunity} · {q.phase}</option>
+                  ))}
+                </select>
+              </p>
+              {!quotationOptions.active && (
+                <p className="mt-0.5 text-[10px] text-gray-500 print:hidden">CRM app is inactive</p>
+              )}
             </div>
           </div>
         </div>

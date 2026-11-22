@@ -11,8 +11,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useCustomers, useMachines, useBranches } from '@/hooks/useQueries';
+import { useCustomers, useMachines, useBranches, useHireAgreementOptions } from '@/hooks/useQueries';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
+import * as hireLink from '@/services/hireLink';
+import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
+import { buildBookingRecord } from './bookingRecord';
 import { Booking } from '@/types';
 import { useBookingStore, computeTotalValue, computeBookingStatus } from '@/store/bookingStore';
 import { CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
@@ -42,6 +45,7 @@ const bookingSchema = z.object({
   paymentTerms:     z.enum(['30', '45', '60', '90', 'Cash Advance', 'PDC']).optional(),
   remarks:          z.string().optional(),
   reserved:         z.boolean().default(false),
+  hireAgreementId:  z.string().optional(),
 }).refine(d => !d.endDate || !d.startDate || new Date(d.endDate) >= new Date(d.startDate), {
   message: 'End date must be after start date',
   path: ['endDate'],
@@ -61,7 +65,9 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
   const { data: machines }  = useMachines();
   const { data: branches }  = useBranches();
   const { addBooking, updateBooking } = useBookingStore();
+  const userBookings = useBookingStore(s => s.userBookings);
   const isEditing = !!booking;
+  const isDemoBooking = !!booking && !userBookings.some(b => b.id === booking.id);
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
@@ -82,6 +88,7 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
       lpoNumber:        (booking as any).lpoNumber ?? '',
       lpoValidityDate:  (booking as any).lpoValidityDate ?? '',
       reserved:         false,
+      hireAgreementId:  booking.hireAgreementId ?? '',
     } : {
       period:           'Monthly',
       time:             'AM',
@@ -92,12 +99,18 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
       haSent:           false,
       haReceived:       false,
       reserved:         false,
+      hireAgreementId:  '',
     },
   });
 
   // Watch fields for live calculations
   const watchedFields = form.watch();
   const { startDate, endDate, dailyRate, quoted, haSent, haReceived, lpoNumber, lpoValidityDate, reserved, branchId } = watchedFields;
+
+  const selectedCustomerName = customers?.find(c => c.id === watchedFields.customerId)?.name;
+  const { data: agreementOptions } = useHireAgreementOptions(selectedCustomerName);
+  const watchedAgreementId = (watchedFields.hireAgreementId ?? '').trim();
+  const linkSummary = watchedAgreementId ? hireLink.describeLink(watchedAgreementId) : undefined;
 
   // Live Total Value
   const totalValue = useMemo(
@@ -122,6 +135,15 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
   );
 
   const onSubmit = async (data: BookingFormData, saveAsReserved = false) => {
+    // Validate the hire agreement reference before touching the store.
+    const validation = hireLink.validateAgreementRef(data.hireAgreementId ?? '');
+    if (!validation.ok) {
+      form.setError('hireAgreementId', { message: validation.message });
+      return;
+    }
+    const linkedAgreementId = validation.agreementId;
+
+    let record: Booking;
     try {
       const customer = customers?.find(c => c.id === data.customerId);
       const machine  = machines?.find(m => m.id === data.machineId);
@@ -140,32 +162,26 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
       const status = computeBookingStatus(bookingData);
 
       const now = new Date().toISOString();
-      const newBooking: Booking = {
-        id:           `bk-user-${Date.now()}`,
-        reference:    `BK-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-        customerId:   data.customerId,
-        customerName: customer?.name ?? data.customerId,
-        machineId:    data.machineId,
-        assetNumber:  machine?.assetNumber ?? data.machineId,
-        machineModel: machine ? `${machine.make} ${machine.model}` : '',
-        branchId:     data.branchId,
-        branchName:   branch?.name ?? data.branchId,
-        startDate:    data.startDate,
-        endDate:      data.endDate,
+      const orgId = useAuthStore.getState().user?.orgId ?? JA_ORG_ID;
+      const newBooking = buildBookingRecord({
+        mode:      isEditing ? 'edit' : 'create',
+        data:      { ...bookingData, hireAgreementId: linkedAgreementId ?? '' },
+        existing:  booking ?? undefined,
+        orgId,
+        now,
+        names: {
+          customerName: customer?.name ?? data.customerId,
+          assetNumber:  machine?.assetNumber ?? data.machineId,
+          machineModel: machine ? `${machine.make} ${machine.model}` : '',
+          branchName:   branch?.name ?? data.branchId,
+        },
         status,
-        deliveryAddress:  data.deliveryAddress,
-        contactPhone:     data.siteContactPhone,
-        operatorRequired: data.operatorRequired,
-        dailyRate:    data.dailyRate,
         totalValue,
-        notes:        data.remarks ?? '',
-        // Extra fields
-        ...(bookingData as any),
-        createdAt: now,
-        updatedAt: now,
-      } as any;
+        idSeed: Date.now(),
+      });
+      record = newBooking;
 
-      if (isEditing) {
+      if (isEditing && booking) {
         updateBooking(booking.id, newBooking);
         toastSuccess('Booking updated');
       } else {
@@ -176,11 +192,17 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
             : 'Booking created — ready to dispatch'
         );
       }
-      form.reset();
-      onClose();
     } catch {
       toastError('Failed to save booking');
+      return;
     }
+
+    // Trigger (a): booking persisted, so raise the On Hire event (never throws).
+    if (record.status === 'On Hire' && record.hireAgreementId) {
+      hireLink.handleOnHire({ source: 'booking', allocationId: record.id });
+    }
+    form.reset();
+    onClose();
   };
 
   const GateItem = ({ done, label }: { done: boolean; label: string }) => (
@@ -355,6 +377,37 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
                 </FormItem>
               )} />
             </div>
+
+            {/* Hire Agreement link */}
+            <FormField control={form.control} name="hireAgreementId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Hire Agreement</FormLabel>
+                <FormControl>
+                  <Input
+                    list="hire-agreement-options"
+                    placeholder="Hire agreement ID (optional)"
+                    disabled={isDemoBooking}
+                    {...field}
+                    value={field.value ?? ''}
+                  />
+                </FormControl>
+                <datalist id="hire-agreement-options">
+                  {agreementOptions?.map(a => (
+                    <option key={a.id} value={a.id}>{a.label}</option>
+                  ))}
+                </datalist>
+                {isDemoBooking && (
+                  <p className="text-xs text-muted-foreground">Demo bookings cannot be linked</p>
+                )}
+                {linkSummary && (
+                  <p className="text-xs text-muted-foreground">
+                    {linkSummary.agreementNo} · {linkSummary.agreementId}
+                    {linkSummary.quotationNumber ? ` · ${linkSummary.quotationNumber}` : ''}
+                  </p>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
 
             {/* Operator Required */}
             <FormField control={form.control} name="operatorRequired" render={({ field }) => (

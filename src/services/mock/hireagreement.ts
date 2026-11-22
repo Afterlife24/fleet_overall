@@ -1,4 +1,4 @@
-﻿import type { HireAgreement } from '@/types/hireagreement';
+﻿import type { SeedHireAgreement } from '@/types/hireagreement';
 
 /**
  * 5 demo hire agreements.
@@ -6,7 +6,7 @@
  * ATTN / contact person: world cricketers — matches customerani.ts exactly.
  * All fields populated, no empty columns.
  */
-export const hireAgreements: HireAgreement[] = [
+export const hireAgreements: SeedHireAgreement[] = [
   {
     id: 'ha-1',
     agreementNo: 'HA-2026-001',
@@ -209,6 +209,6 @@ export const hireAgreements: HireAgreement[] = [
   },
 ];
 
-export function getHireAgreementById(id: string): HireAgreement | undefined {
+export function getHireAgreementById(id: string): SeedHireAgreement | undefined {
   return hireAgreements.find((h) => h.id === id);
 }

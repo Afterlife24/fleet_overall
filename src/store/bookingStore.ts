@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Booking } from '@/types/booking';
 import { bookings as mockBookings } from '@/services/mock/bookings';
+import { demoBookings } from '@/services/mock/demoHireLink';
 
 // Deterministic color palette — hash customerId → consistent color
 const CUSTOMER_COLORS = [
@@ -79,17 +80,22 @@ interface BookingState {
 export const useBookingStore = create<BookingState>()(
   persist(
     (set, get) => ({
-      userBookings: [],
+      // Demo data: linked bookings for the Johnson Arabia demo org (see demoHireLink.ts).
+      userBookings: demoBookings,
 
       addBooking: (booking) =>
         set((state) => ({ userBookings: [...state.userBookings, booking] })),
 
-      updateBooking: (id, data) =>
+      updateBooking: (id, data) => {
+        // A stray id in the patch must never overwrite the record id.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _ignored, ...rest } = data;
         set((state) => ({
           userBookings: state.userBookings.map((b) =>
-            b.id === id ? { ...b, ...data, updatedAt: new Date().toISOString() } : b
+            b.id === id ? { ...b, ...rest, updatedAt: new Date().toISOString() } : b
           ),
-        })),
+        }));
+      },
 
       deleteBooking: (id) =>
         set((state) => ({
@@ -101,6 +107,18 @@ export const useBookingStore = create<BookingState>()(
         return [...mockBookings, ...userBookings];
       },
     }),
-    { name: 'fleet-bookings-v1' }
+    {
+      name: 'fleet-bookings-v1',
+      version: 2,
+      // v0 -> v1: new optional fields (orgId, hireAgreementId) are absent on
+      // legacy rows, which therefore load as unlinked. Records are unchanged.
+      // v1 -> v2: add the demo bookings the user does not have yet.
+      migrate: (persisted) => {
+        const p = persisted as { userBookings?: Booking[] } | undefined;
+        const existing = Array.isArray(p?.userBookings) ? p.userBookings : [];
+        const have = new Set(existing.map((b) => b.id));
+        return { userBookings: [...existing, ...demoBookings.filter((d) => !have.has(d.id))] };
+      },
+    }
   )
 );

@@ -1,7 +1,13 @@
 ﻿export type HireAgreementStatus = 'Draft' | 'Active' | 'Completed' | 'Cancelled';
 
+export type SeedHireAgreement = Omit<HireAgreement, 'orgId' | 'quotationId'>;
+
 export interface HireAgreement {
   id: string;
+  /** Owning organisation. */
+  orgId: string;
+  /** Linked Quotation.id, '' when not linked. */
+  quotationId: string;
   agreementNo: string;
   date: string;
   status: HireAgreementStatus;

@@ -1,10 +1,10 @@
-﻿import {
+import {
   Forklift, ArrowRightLeft, CalendarDays, Wrench, Truck as TruckIcon,
   ScanLine, ClipboardCheck, BarChart3, Building2, Gauge,
   FileText, AlertTriangle, ShieldCheck, PackageCheck, KanbanSquare,
   Map as MapIcon, Route as RouteIcon, TrendingUp,
   FileSignature, ShoppingCart, Send, Undo2, Receipt, FileSpreadsheet, BadgeDollarSign,
-  Users2,
+  Users2, Handshake,
 } from 'lucide-react';
 
 /**
@@ -157,6 +157,11 @@ export const APPS: AppDef[] = [
     paths: ['/docs/collection-note'], labels: ['Collection Notes'],
   },
   {
+    id: 'third_party_services', name: 'Third-Party Services', summary: 'Outside services used for collections',
+    icon: TruckIcon, category: 'Documents', color: '#ec4899',
+    paths: ['/docs/third-party-services'], labels: ['Third-Party Services'],
+  },
+  {
     id: 'invoice', name: 'Invoice', summary: 'Customer invoices',
     icon: Receipt, category: 'Documents', color: '#8b5cf6',
     paths: ['/docs/invoice'], labels: ['Invoices'],
@@ -177,6 +182,11 @@ export const APPS: AppDef[] = [
     id: 'customer_ani', name: 'Customer', summary: 'Customer master records — IDs, TRN, ATTL and contact details',
     icon: Users2, category: 'Management', color: '#06b6d4',
     paths: ['/customer-ani'], labels: ['Customer'],
+  },
+  {
+    id: 'crm', name: 'CRM', summary: 'Quotation pipeline: Awaiting, Tender, Lost and Won',
+    icon: Handshake, category: 'Management', color: '#7c3aed', depends: ['customer_ani', 'invoice'],
+    paths: ['/crm', '/crm/lost', '/crm/won'], labels: ['CRM Pipeline', 'Lost Quotations', 'Won Quotations'],
   },
   {
     id: 'reports', name: 'Reports', summary: 'Analytics and performance dashboards',

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useCreateCustomerANI, useUpdateCustomerANI } from '@/hooks/useQueries';
 import type { CustomerANI } from '@/types/customerani';
+import { DuplicateCustomerError } from '@/store/customerStore';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { cn } from '@/lib/utils';
 
@@ -84,8 +85,8 @@ export function CustomerANIFormDialog({ open, onClose, editRecord }: Props) {
         toastSuccess('Customer created');
       }
       onClose();
-    } catch {
-      toastError('Could not save. Please try again.');
+    } catch (err) {
+      toastError(err instanceof DuplicateCustomerError ? err.message : 'Could not save. Please try again.');
     }
   };
 

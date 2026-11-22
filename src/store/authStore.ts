@@ -217,7 +217,7 @@ export const demoAccounts: DemoAccount[] = [
   { email: 'finance@johnsonarabia.com', password: 'fin123', name: 'Joe Root', role: 'Finance', branchName: 'Dubai HQ', avatarColor: '#eab308' },
 ];
 
-interface AuthUser {
+export interface AuthUser {
   name: string;
   email: string;
   role: UserRole;

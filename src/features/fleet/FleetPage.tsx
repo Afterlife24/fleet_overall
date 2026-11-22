@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/common/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { SlideOver } from '@/components/common/SlideOver';
@@ -21,7 +22,15 @@ import { SchemaCustomizer } from '@/features/apps/SchemaCustomizer';
 import { SchemaFilterBar, applySchemaFilters } from '@/features/apps/SchemaFilterBar';
 import { SchemaForm } from '@/features/apps/SchemaForm';
 import { useAppOnboarding } from '@/hooks/useAppOnboarding';
-import { useAuthStore } from '@/store/authStore';
+import { JA_ORG_ID, useAuthStore } from '@/store/authStore';
+import { useAppStore } from '@/store/appStore';
+import { machinesForOrg } from '@/services/mock/orgData';
+import { canInitiate } from '@/services/collectionCore';
+import { resolveFleetQueryForCurrentOrg } from '@/services/collectionDocs';
+import { toMachineLite, appMachineResolver, appCreateTransportJob } from '@/features/fleet/collectionWiring';
+import { MachineQrPanel } from '@/features/fleet/MachineQrPanel';
+import { InitiateDialog } from '@/features/collection/InitiateDialog';
+import { toastError, toastSuccess } from '@/lib/toast-helper';
 import { useOrgStore } from '@/store/orgStore';
 import { useCreateMachine, useUpdateMachine } from '@/hooks/useQueries';
 import { tableFields, filterableFields } from '@/types/schema';
@@ -32,6 +41,16 @@ import {
 
 const CATEGORIES: (MachineCategory | 'All')[] = ['All', 'Articulating Boom', 'Telescopic Boom', 'Scissor Lift', 'Telehandler', 'Vertical Mast', 'Trailer Mounted'];
 const STATUSES: (MachineStatus | 'All')[] = ['All', 'Available', 'On Hire', 'Under Repair', 'In Workshop', 'PDI', 'PHI', 'Transport', 'Breakdown', 'Offline'];
+
+const DEEP_LINK_MESSAGES: Record<string, string> = {
+  DEEP_LINK_NOT_FOUND: 'Machine not found for this link (DEEP_LINK_NOT_FOUND)',
+  NOT_FOUND: 'Machine not found (NOT_FOUND)',
+  OTHER_ORG: 'This QR code belongs to another organisation (OTHER_ORG)',
+  AMBIGUOUS: 'Fleet number matches more than one machine (AMBIGUOUS)',
+  MISMATCH: 'QR code does not match the machine record (MISMATCH)',
+  OTHER: 'Unrecognised QR code (OTHER)',
+};
+
 
 export function FleetPage() {
   const { data: machines, isLoading, isError, refetch } = useMachines();
@@ -51,6 +70,37 @@ export function FleetPage() {
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const createMachine = useCreateMachine();
   const updateMachine = useUpdateMachine();
+  const [initiateOpen, setInitiateOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const orgId = authUser?.orgId ?? JA_ORG_ID;
+  const collectionActive = useOrgStore((s) => s.isAppActive(orgId, 'collection_note'));
+  const lastHandledQuery = useRef<string | null>(null);
+
+  // Deep links: ?fleet= / ?id= / ?qr= open the machine detail (or toast the error code).
+  const fleetParam = searchParams.get('fleet') ?? undefined;
+  const idParam = searchParams.get('id') ?? undefined;
+  const qrParam = searchParams.get('qr') ?? undefined;
+  useEffect(() => {
+    if (!machines) return;
+    if (!fleetParam && !idParam && !qrParam) return;
+    const key = `${fleetParam ?? ''}|${idParam ?? ''}|${qrParam ?? ''}`;
+    if (lastHandledQuery.current === key) return;
+    lastHandledQuery.current = key;
+    const res = resolveFleetQueryForCurrentOrg(
+      { fleet: fleetParam, id: idParam, qr: qrParam },
+      appMachineResolver,
+    );
+    if (!res) return;
+    if (res.ok) {
+      const found =
+        filtered.find((m) => m.id === res.machine.id) ??
+        machinesForOrg(orgId).find((m) => m.id === res.machine.id);
+      if (found) setSelected(found);
+      else toastError(DEEP_LINK_MESSAGES.NOT_FOUND);
+    } else {
+      toastError(DEEP_LINK_MESSAGES[res.error] ?? `Cannot open machine (${res.error})`);
+    }
+  }, [machines, filtered, fleetParam, idParam, qrParam, orgId]);
 
   // System field keys for Fleet = the default schema's system keys. Values for
   // these go to the record root; custom fields go into a `fields` bag.
@@ -178,14 +228,38 @@ export function FleetPage() {
         description={selected ? `${selected.assetNumber} · ${selected.branchName}` : ''}
         width="xl"
         footer={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" className="flex-1"><Wrench className="mr-1.5 h-4 w-4" /> Send to Workshop</Button>
             <Button size="sm" className="flex-1"><Calendar className="mr-1.5 h-4 w-4" /> New Booking</Button>
+            {selected && canInitiate(
+              useAppStore.getState().getMachineCurrentStatus(selected.id) ?? selected.status,
+              collectionActive,
+            ) && (
+              <Button variant="outline" size="sm" className="w-full" onClick={() => setInitiateOpen(true)}>
+                Initiate Off-Hire / Collection
+              </Button>
+            )}
           </div>
         }
       >
-        {selected && <MachineDetail machine={selected} />}
+        {selected && (
+          <>
+            <MachineQrPanel machine={toMachineLite(selected, orgId)} />
+            <MachineDetail machine={selected} />
+          </>
+        )}
       </SlideOver>
+
+      {selected && (
+        <InitiateDialog
+          open={initiateOpen}
+          onOpenChange={setInitiateOpen}
+          machines={appMachineResolver}
+          createTransportJob={appCreateTransportJob}
+          preselectMachineId={selected.id}
+          onCreated={(r) => { if (r.cn) toastSuccess(`Created ${r.cn.number}`); }}
+        />
+      )}
 
       <SchemaForm
         title={editingMachine ? 'Edit Machine' : 'Add Machine'}

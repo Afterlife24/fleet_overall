@@ -14,6 +14,7 @@ import type { CustomerANI, CustomerANIStatus } from '@/types/customerani';
 import { formatCurrency } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { CustomerANIFormDialog } from './CustomerANIFormDialog';
+import { CustomerLinksSection } from './CustomerLinksSection';
 import {
   Plus, Users2, Download, Filter, WifiHigh, Building2, CreditCard,
 } from 'lucide-react';
@@ -216,6 +217,8 @@ export function CustomerANIPage() {
               <InfoRow label="Address" value={selected.address} />
               <InfoRow label="Billing Address" value={selected.billingAddress ?? selected.address} />
             </InfoGrid>
+
+            <CustomerLinksSection customerId={selected.customerId} />
 
             {selected.notes && (
               <>

@@ -1,4 +1,4 @@
-﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   machineService, bookingService, workshopService, transportService,
   inspectionService, breakdownService, jobCardService, userService,
@@ -6,6 +6,9 @@ import {
   sixSigmaService, crossHireService, customerANIService, hireAgreementService, taxInvoiceService,
 } from '@/services/services';
 import { useBranchStore } from '@/store/branchStore';
+import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
+import * as hireLink from '@/services/hireLink';
+import type { JobPatch, TransportJobStatus } from '@/types/transport';
 
 export const queryKeys = {
   machines: ['machines'] as const,
@@ -122,7 +125,8 @@ export function useCustomers() {
   return useQuery({ queryKey: queryKeys.customers, queryFn: customerService.list });
 }
 export function useGateEntries() {
-  return useQuery({ queryKey: queryKeys.gateEntries, queryFn: gateService.list });
+  const orgId = useAuthStore((s) => s.user?.orgId ?? JA_ORG_ID);
+  return useQuery({ queryKey: [...queryKeys.gateEntries, orgId], queryFn: gateService.list });
 }
 export function useKPIs() {
   const branchId = useBranchStore((s) => s.selectedBranchId);
@@ -472,7 +476,8 @@ export function useCreateTransportJob() {
   return useMutation({
     mutationFn: transportService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transportJobs });
+      // The board and counters are right on the next render, before any refetch.
+      queryClient.setQueryData(queryKeys.transportJobs, transportService.listNow());
       queryClient.invalidateQueries({ queryKey: ['kpis'] });
     },
   });
@@ -481,9 +486,9 @@ export function useCreateTransportJob() {
 export function useUpdateTransportJob() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => transportService.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: JobPatch }) => transportService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transportJobs });
+      queryClient.setQueryData(queryKeys.transportJobs, transportService.listNow());
     },
   });
 }
@@ -491,9 +496,9 @@ export function useUpdateTransportJob() {
 export function useUpdateTransportJobStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => transportService.updateStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: TransportJobStatus }) => transportService.updateStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transportJobs });
+      queryClient.setQueryData(queryKeys.transportJobs, transportService.listNow());
       queryClient.invalidateQueries({ queryKey: ['kpis'] });
     },
   });
@@ -705,6 +710,21 @@ export function useDeleteHireAgreement() {
   return useMutation({
     mutationFn: (id: string) => hireAgreementService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.hireAgreements }); },
+  });
+}
+
+export function useQuotationOptions(companyName: string) {
+  const orgId = useAuthStore((s) => s.user?.orgId ?? JA_ORG_ID);
+  return useQuery({
+    queryKey: [...queryKeys.hireAgreements, 'quotation-options', companyName] as const,
+    queryFn: () => hireLink.listQuotationOptions(orgId, companyName),
+  });
+}
+
+export function useHireAgreementOptions(customerName?: string) {
+  return useQuery({
+    queryKey: [...queryKeys.hireAgreements, 'agreement-options', customerName ?? ''] as const,
+    queryFn: () => hireLink.listAgreementOptions(customerName),
   });
 }
 

@@ -6,6 +6,7 @@ import { LoadingState } from '@/components/common/EmptyState';
 import { useWorkshopJobs, useTransportJobs, useUpdateWorkshopJobStatus, useUpdateTransportJobStatus } from '@/hooks/useQueries';
 import { useBranchFilter } from '@/hooks/useBranchFilter';
 import { getStatusColor } from '@/utils/statusColors';
+import type { TransportJobStatus } from '@/types/transport';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Wrench, Truck, GripVertical, MapPin, User } from 'lucide-react';
@@ -140,7 +141,7 @@ function TransportBoard() {
     if (dragId) {
       const job = jobs.find((j) => j.id === dragId);
       if (job && job.status !== col) {
-        updateStatus.mutate({ id: dragId, status: col });
+        updateStatus.mutate({ id: dragId, status: col as TransportJobStatus });
         toast.success(`${job.assetNumber} → ${col}`);
       }
     }

@@ -1,5 +1,5 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useRef } from 'react';
+import { useForm, type FieldErrors, type Resolver } from 'react-hook-form';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,30 +10,62 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card } from '@/components/ui/card';
 import { useCreateTransportJob, useMachines, useDrivers } from '@/hooks/useQueries';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
+import { TransportValidationError } from '@/services/services';
+import {
+  TRANSPORT_SALES, TRANSPORT_SHIFTS, TRANSPORT_TYPES, SR_NO_MIN, SR_NO_MAX,
+} from '@/services/transportCore';
 
 // REF-13 Transport Schedule — exact 15 fields (4 header + 11 per job)
 const transportJobSchema = z.object({
   // ── HEADER — 4 fields (REF-13) ───────────────────────────────
   plannerName:    z.string().min(1, 'Planner name required'),     // Planner Name
   date:           z.string().min(1, 'Date required'),             // Date
-  shift:          z.enum(['Morning', 'Evening']),                 // Shift
+  shift:          z.enum(TRANSPORT_SHIFTS),                       // Shift
   transportTeam:  z.string().min(1, 'Transport team required'),   // Transport Team (e.g. MT 4 - RACHHPAL)
 
   // ── TRANSPORT RECORD — 11 fields (REF-13) ────────────────────
-  srNo:      z.coerce.number().min(1),                            // Sr. No
+  srNo:      z.coerce.number({ message: 'Sr. No required' })      // Sr. No
+               .int('Sr. No must be a whole number')
+               .min(SR_NO_MIN, `Sr. No must be at least ${SR_NO_MIN}`)
+               .max(SR_NO_MAX, `Sr. No must be at most ${SR_NO_MAX}`),
   fleet:     z.string().min(1, 'Fleet number required'),          // Fleet (fleet number(s))
   from:      z.string().min(1, 'Pickup location required'),       // From
   to:        z.string().min(1, 'Delivery destination required'),  // To
   transport: z.string().min(1, 'Transport vehicle required'),     // Transport (MT 4 [S], MT 4 [R])
-  type:      z.enum(['D', 'T', 'O', 'T2']),                      // Type (D/T/O/T2)
+  type:      z.enum(TRANSPORT_TYPES),                             // Type (D/T/O/T2)
   contact:   z.string().min(1, 'Contact required'),               // Contact (driver/site contact + phone)
-  sales:     z.enum(['BG', 'AD', 'CH', 'AM', 'SM', 'SK', 'TD', 'SH', 'MT', 'TS']), // Sales (rep code)
+  sales:     z.enum(TRANSPORT_SALES, { message: 'Sales code required' }), // Sales (rep code)
   client:    z.string().min(1, 'Client required'),                // Client
   time:      z.string().min(1, 'Time required'),                  // Time
   remarks:   z.string().optional(),                               // Remarks (TBC, Transfer, special)
 });
 
 type TransportJobFormData = z.infer<typeof transportJobSchema>;
+
+// @hookform/resolvers 3.x cannot read zod 4 errors (it throws the raw ZodError), so the
+// schema result is mapped to react-hook-form field errors here.
+const transportResolver: Resolver<TransportJobFormData> = async (values) => {
+  const parsed = transportJobSchema.safeParse(values);
+  if (parsed.success) return { values: parsed.data, errors: {} };
+  const errors: Record<string, { type: string; message: string }> = {};
+  for (const issue of parsed.error.issues) {
+    const name = String(issue.path[0] ?? '');
+    if (name && !errors[name]) errors[name] = { type: issue.code, message: issue.message };
+  }
+  return { values: {}, errors: errors as FieldErrors<TransportJobFormData> };
+};
+
+const EMPTY_TEXT = {
+  plannerName: '', transportTeam: '', fleet: '', from: '', to: '', transport: '', contact: '',
+  client: '', time: '', remarks: '',
+};
+const freshDefaults = () => ({
+  ...EMPTY_TEXT,
+  date: new Date().toISOString().split('T')[0],
+  shift: 'Morning' as const,
+  type: 'D' as const,
+  srNo: 1,
+});
 
 interface TransportJobDialogProps {
   open: boolean;
@@ -54,23 +86,33 @@ export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
   const createMutation = useCreateTransportJob();
 
   const form = useForm<TransportJobFormData>({
-    resolver: zodResolver(transportJobSchema),
-    defaultValues: {
-      date:  new Date().toISOString().split('T')[0],
-      shift: 'Morning',
-      type:  'D',
-      srNo:  1,
-    },
+    resolver: transportResolver,
+    defaultValues: freshDefaults() as Partial<TransportJobFormData>,
   });
 
+  // Set synchronously on the first click so a second click cannot create a second job.
+  const submitting = useRef(false);
+
   const onSubmit = async (data: TransportJobFormData) => {
+    if (submitting.current) return;
+    submitting.current = true;
     try {
       await createMutation.mutateAsync(data);
       toastSuccess('Transport job created successfully');
-      form.reset();
+      form.reset(freshDefaults() as Partial<TransportJobFormData>);
       onClose();
-    } catch {
-      toastError('Failed to create transport job');
+    } catch (err) {
+      // Values stay in the form so the planner can correct and retry.
+      if (err instanceof TransportValidationError) {
+        for (const [name, message] of Object.entries(err.errors)) {
+          form.setError(name as keyof TransportJobFormData, { message });
+        }
+        toastError('Please fix the highlighted fields');
+      } else {
+        toastError(err instanceof Error && err.message ? `Failed to create transport job: ${err.message}` : 'Failed to create transport job');
+      }
+    } finally {
+      submitting.current = false;
     }
   };
 
@@ -250,7 +292,7 @@ export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="Rep code" /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {['BG', 'AD', 'CH', 'AM', 'SM', 'SK', 'TD', 'SH', 'MT', 'TS'].map(r => (
+                        {TRANSPORT_SALES.map(r => (
                           <SelectItem key={r} value={r}>{r}</SelectItem>
                         ))}
                       </SelectContent>
@@ -296,7 +338,7 @@ export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending}>
+              <Button type="submit" disabled={createMutation.isPending || form.formState.isSubmitting}>
                 {createMutation.isPending ? 'Creating...' : 'Create Transport Job'}
               </Button>
             </DialogFooter>

@@ -1,7 +1,18 @@
 ﻿export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue' | 'Cancelled';
 
+export type InvoiceType = 'Continuous Hire' | 'Off-Hire';
+
 export interface TaxInvoice {
   id: string;
+  // Quotation link (all optional; undefined quotationId = legacy invoice)
+  orgId?: string;
+  quotationId?: string;
+  quotationNumber?: string;
+  invoiceType?: InvoiceType;
+  periodStart?: string; // YYYY-MM-DD
+  periodEnd?: string; // YYYY-MM-DD
+  sequence?: number; // 1..99
+  hireAgreementId?: string;
   invoiceNo: string;
   invoiceDate: string;
   dueDate: string;

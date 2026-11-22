@@ -1,14 +1,10 @@
-﻿import type {
+import type {
   Machine, Branch, Customer, Booking, WorkshopJob, Technician, WorkshopBay,
   Driver, Truck, TransportJob, Inspection, Breakdown, JobCard, User,
   AppNotification, GateEntry,
 } from '@/types';
 import type { CrossHire } from '@/types/crosshire';
 import type { CustomerANI } from '@/types/customerani';
-import type { HireAgreement } from '@/types/hireagreement';
-import type { TaxInvoice } from '@/types/taxinvoice';
-import { taxInvoices as demoTaxInvoices } from './taxinvoice';
-import { hireAgreements as demoHireAgreements } from './hireagreement';
 import { JA_ORG_ID } from '@/store/orgStore';
 import demo from './johnsonArabiaDemo.json';
 import { customerANIs as demoCustomerANIs } from './customerani';
@@ -65,6 +61,16 @@ function collectionForOrg<K extends Coll>(orgId: string, name: K): DemoData[K] {
 }
 
 export const machinesForOrg = (orgId: string) => collectionForOrg(orgId, 'machines');
+
+/** Finds a machine by id in any company's loaded machine list (used for its base status). */
+export function findLoadedMachine(machineId: string): Machine | undefined {
+  for (const key of Object.keys(cache)) {
+    if (!key.endsWith(':machines')) continue;
+    const hit = (cache[key] as Machine[]).find((m) => m.id === machineId);
+    if (hit) return hit;
+  }
+  return undefined;
+}
 export const crossHiresForOrg = (orgId: string) => collectionForOrg(orgId, 'crossHires');
 export const bookingsForOrg = (orgId: string) => collectionForOrg(orgId, 'bookings');
 export const workshopJobsForOrg = (orgId: string) => collectionForOrg(orgId, 'workshopJobs');
@@ -94,24 +100,4 @@ export function customerANIsForOrg(orgId: string): CustomerANI[] {
     customerANICache[orgId] = [...demoCustomerANIs]; // all orgs get the 5 demo customers
   }
   return customerANICache[orgId];
-}
-
-// ── Hire Agreements (independent dataset) ────────────────────────────────────
-const hireAgreementCache: Record<string, HireAgreement[]> = {};
-
-export function hireAgreementsForOrg(orgId: string): HireAgreement[] {
-  if (!hireAgreementCache[orgId]) {
-    hireAgreementCache[orgId] = [...demoHireAgreements]; // all orgs get the 5 demo agreements
-  }
-  return hireAgreementCache[orgId];
-}
-
-// -- Tax Invoices (independent dataset) -------------------------------------
-const taxInvoiceCache: Record<string, TaxInvoice[]> = {};
-
-export function taxInvoicesForOrg(orgId: string): TaxInvoice[] {
-  if (!taxInvoiceCache[orgId]) {
-    taxInvoiceCache[orgId] = [...demoTaxInvoices];
-  }
-  return taxInvoiceCache[orgId];
 }

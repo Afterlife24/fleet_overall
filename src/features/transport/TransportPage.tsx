@@ -7,13 +7,12 @@ import { SlideOver } from '@/components/common/SlideOver';
 import { InfoGrid, InfoRow, SectionTitle } from '@/components/common/InfoGrid';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useTransportJobs, useDrivers, useTrucks } from '@/hooks/useQueries';
+import { useTransportJobs, useDrivers, useTrucks, useUpdateTransportJob } from '@/hooks/useQueries';
 import { useBranchFilter } from '@/hooks/useBranchFilter';
-import { TransportJob, TransportJobStatus } from '@/types/transport';
-import { formatDateTime } from '@/utils/format';
+import type { TransportJobStatus } from '@/types/transport';
+import { ref13Rows, transportCounters } from '@/services/transportCore';
 import { cn } from '@/lib/utils';
-import { toastSuccess } from '@/lib/toast-helper';
-import { useAppStore } from '@/store/appStore';
+import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { TransportJobDialog } from './TransportJobDialog';
 import { Truck, MapPin, Plus, Navigation, ArrowRightLeft } from 'lucide-react';
 
@@ -24,19 +23,22 @@ export function TransportPage() {
   const filteredJobs = useBranchFilter(jobs);
   const filteredDrivers = useBranchFilter(drivers);
   const filteredTrucks = useBranchFilter(trucks);
-  const [selected, setSelected] = useState<TransportJob | null>(null);
+  // Keep the id, not the row, so the panel always shows the stored status and driver.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = jobs?.find((j) => j.id === selectedId) ?? null;
   const [createJobOpen, setCreateJobOpen] = useState(false);
   const [reassigningDriver, setReassigningDriver] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const { updateTransportJob } = useAppStore();
+  const updateJob = useUpdateTransportJob();
 
-  const activeJobs = filteredJobs.filter((j) => j.status === 'In Transit' || j.status === 'Loading').length;
-  const scheduledJobs = filteredJobs.filter((j) => j.status === 'Scheduled').length;
-  const completedJobs = filteredJobs.filter((j) => j.status === 'Completed' || j.status === 'Delivered').length;
+  const counters = transportCounters(filteredJobs);
+  const activeJobs = counters.active;
+  const scheduledJobs = counters.scheduled;
+  const completedJobs = counters.completed;
   const availableDrivers = filteredDrivers.filter((d) => d.status === 'Available').length;
 
-  const todayDeliveries = filteredJobs.filter((j) => j.type === 'Delivery').length;
-  const todayCollections = filteredJobs.filter((j) => j.type === 'Collection').length;
+  const todayDeliveries = counters.deliveries;
+  const todayCollections = counters.collections;
 
   return (
     <div className="space-y-5">
@@ -78,12 +80,12 @@ export function TransportPage() {
         <Card className="p-4">
           <h3 className="mb-3 text-sm font-semibold text-foreground">Today's Dispatch Board</h3>
           <div className="space-y-2">
-            {filteredJobs.slice(0, 8).map((job) => {
+            {filteredJobs.map((job) => {
               const driver = drivers?.find((d) => d.id === job.driverId);
               return (
                 <button
                   key={job.id}
-                  onClick={() => setSelected(job)}
+                  onClick={() => setSelectedId(job.id)}
                   className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -96,8 +98,8 @@ export function TransportPage() {
                     </div>
                     <p className="truncate text-xs text-muted-foreground">{job.assetNumber} · {job.machineModel}</p>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{job.destination.split('-')[0]}</span>
-                      <span className="flex items-center gap-0.5"><Navigation className="h-3 w-3" />{job.distance}km</span>
+                      <span className="flex items-center gap-0.5"><MapPin className="h-3 w-3" />{job.destination?.split('-')[0] ?? '—'}</span>
+                      <span className="flex items-center gap-0.5"><Navigation className="h-3 w-3" />{job.distance ?? '—'}{job.distance !== undefined ? 'km' : ''}</span>
                     </div>
                   </div>
                   {driver && <Avatar name={driver.name} color="#0ea5e9" size="sm" />}
@@ -152,7 +154,7 @@ export function TransportPage() {
       {/* Job detail */}
       <SlideOver
         open={!!selected}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedId(null)}
         title={selected ? selected.reference : ''}
         description={selected ? `${selected.assetNumber} · ${selected.machineModel}` : ''}
         width="md"
@@ -167,13 +169,13 @@ export function TransportPage() {
                     if (!selected) return;
                     setReassigningDriver(true);
                     const driver = filteredDrivers?.find(d => d.id === driverId);
-                    updateTransportJob(selected.id, {
-                      driverId,
-                      driverName: driver?.name ?? driverId,
-                    });
-                    toastSuccess(`Driver ${driver?.name} assigned`);
-                    setReassigningDriver(false);
-                    setSelected({ ...selected, driverId, driverName: driver?.name ?? driverId });
+                    updateJob.mutateAsync({
+                      id: selected.id,
+                      data: { driverId, driverName: driver?.name ?? driverId },
+                    })
+                      .then(() => toastSuccess(`Driver ${driver?.name ?? driverId} assigned`))
+                      .catch(() => toastError('Failed to assign driver'))
+                      .finally(() => setReassigningDriver(false));
                   }}
                 >
                   <SelectTrigger className="flex-1"><SelectValue placeholder="Reassign Driver..." /></SelectTrigger>
@@ -191,10 +193,10 @@ export function TransportPage() {
                   onValueChange={(newStatus) => {
                     if (!selected) return;
                     setUpdatingStatus(true);
-                    updateTransportJob(selected.id, { status: newStatus as TransportJobStatus });
-                    toastSuccess(`Status updated to ${newStatus}`);
-                    setUpdatingStatus(false);
-                    setSelected({ ...selected, status: newStatus as TransportJobStatus });
+                    updateJob.mutateAsync({ id: selected.id, data: { status: newStatus as TransportJobStatus } })
+                      .then(() => toastSuccess(`Status updated to ${newStatus}`))
+                      .catch(() => toastError('Failed to update status'))
+                      .finally(() => setUpdatingStatus(false));
                   }}
                 >
                   <SelectTrigger className="flex-1"><SelectValue placeholder="Update Status..." /></SelectTrigger>
@@ -215,34 +217,13 @@ export function TransportPage() {
             <div className="mb-4 flex items-center gap-2">
               <StatusBadge status={selected.status} />
               <StatusBadge status={selected.type} size="sm" />
-              {(selected as any).shift && <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{(selected as any).shift}</span>}
             </div>
             <SectionTitle>Transport Schedule (REF-13)</SectionTitle>
             <InfoGrid columns={2}>
-              <InfoRow label="Sr. No" value={(selected as any).srNo ?? '—'} />
-              <InfoRow label="Planner" value={(selected as any).plannerName ?? '—'} />
-              <InfoRow label="Date" value={(selected as any).date ?? ''} />
-              <InfoRow label="Shift" value={(selected as any).shift ?? '—'} />
-              <InfoRow label="Transport Team" value={(selected as any).transportTeam ?? selected.truckRegistration} />
-              <InfoRow label="Fleet (EqptNo)" value={(selected as any).fleet ?? selected.assetNumber} />
+              {ref13Rows(selected).map((row) => (
+                <InfoRow key={row.label} label={row.label} value={row.value} />
+              ))}
             </InfoGrid>
-            <SectionTitle>Route Details</SectionTitle>
-            <InfoGrid columns={2}>
-              <InfoRow label="From" value={(selected as any).from ?? selected.origin} />
-              <InfoRow label="To" value={(selected as any).to ?? selected.destination} />
-              <InfoRow label="Transport Vehicle" value={(selected as any).transport ?? selected.truckRegistration} />
-              <InfoRow label="Type" value={(selected as any).type ?? selected.type} />
-              <InfoRow label="Contact" value={(selected as any).contact ?? '—'} />
-              <InfoRow label="Sales Rep" value={(selected as any).sales ?? '—'} />
-              <InfoRow label="Client" value={(selected as any).client ?? '—'} />
-              <InfoRow label="Time" value={(selected as any).time ?? formatDateTime(selected.scheduledTime)} />
-            </InfoGrid>
-            {(selected as any).remarks && (
-              <>
-                <SectionTitle>Remarks</SectionTitle>
-                <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">{(selected as any).remarks}</p>
-              </>
-            )}
           </div>
         )}
       </SlideOver>

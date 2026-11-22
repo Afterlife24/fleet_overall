@@ -4,15 +4,17 @@ import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { SlideOver } from '@/components/common/SlideOver';
-import { InfoGrid, InfoRow, SectionTitle } from '@/components/common/InfoGrid';
 import { useGateEntries, useApproveGateEntry, useCompleteGateEntry } from '@/hooks/useQueries';
 import { useBranchFilter } from '@/hooks/useBranchFilter';
 import { GateEntry } from '@/types/gate';
-import { formatDateTime, timeAgo } from '@/utils/format';
+import { timeAgo } from '@/utils/format';
+import { formatGateWhen } from '@/services/gateCore';
+import type { GateWhen } from '@/services/gateCore';
 import { cn } from '@/lib/utils';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { GatePassDialog } from './GatePassDialog';
-import { LogIn, LogOut, Plus, Search, Clock, MapPin, FileText, Truck, User, Package } from 'lucide-react';
+import { GatePassPanel } from './GatePassPanel';
+import { LogIn, LogOut, Plus, Search, Clock } from 'lucide-react';
 
 export function GatePage() {
   const { data: entries, isLoading } = useGateEntries();
@@ -54,14 +56,16 @@ export function GatePage() {
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((e) =>
-        e.assetNumber.toLowerCase().includes(q) ||
-        e.machineModel.toLowerCase().includes(q) ||
-        e.driver.toLowerCase().includes(q) ||
-        e.reference.toLowerCase().includes(q)
+        (e.assetNumber ?? '').toLowerCase().includes(q) ||
+        (e.machineModel ?? '').toLowerCase().includes(q) ||
+        (e.driver ?? '').toLowerCase().includes(q) ||
+        (e.reference ?? '').toLowerCase().includes(q)
       );
     }
     return list;
   }, [filteredEntries, tab, search]);
+
+  const when: GateWhen = selected ? formatGateWhen(selected) : { available: false };
 
   const pending = filteredEntries.filter((e) => e.status === 'Pending').length;
   const inCount = filteredEntries.filter((e) => e.direction === 'IN').length;
@@ -197,49 +201,16 @@ export function GatePage() {
         title={selected ? selected.reference : ''}
         description={selected ? `${selected.assetNumber} · ${selected.machineModel}` : ''}
         width="md"
-        footer={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1">Print Gate Pass</Button>
-            <Button size="sm" className="flex-1">Process Entry</Button>
-          </div>
-        }
       >
-        {selected && (
-          <div className="space-y-1">
-            <div className="mb-4 flex items-center gap-2">
-              <StatusBadge status={selected.status} />
-              <span className={cn(
-                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
-                selected.direction === 'IN' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400'
-              )}>
-                {selected.direction === 'IN' ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}
-                {selected.direction === 'IN' ? 'Check-in' : 'Check-out'}
-              </span>
-            </div>
-            <SectionTitle>Gate Entry Details (REF-06)</SectionTitle>
-            <InfoGrid columns={2}>
-              <InfoRow label="Fleet No. (EqptNo)" value={selected.assetNumber} />
-              <InfoRow label="Truck Plate" value={(selected as any).truckPlate ?? '—'} />
-              <InfoRow label="Arriving From" value={(selected as any).arrivingFrom ?? selected.destination} />
-              <InfoRow label="Direction" value={selected.direction === 'IN' ? 'IN — Machine arriving' : 'OUT — Machine departing'} />
-              <InfoRow label="Gate Pass" value={selected.gatePass} />
-              <InfoRow label="Driver" value={selected.driver} />
-              <InfoRow label="Branch" value={selected.branchName} />
-              <InfoRow label="Timestamp" value={formatDateTime(selected.timestamp)} />
-            </InfoGrid>
-            {selected.notes && (
-              <>
-                <SectionTitle>Notes</SectionTitle>
-                <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">{selected.notes}</p>
-              </>
-            )}
-          </div>
-        )}
+        {selected && <GatePassPanel key={selected.id} entry={selected} when={when} />}
       </SlideOver>
-
-      <GatePassDialog 
-        open={createPassOpen} 
-        onClose={() => setCreatePassOpen(false)} 
+      <GatePassDialog
+        open={createPassOpen}
+        onClose={() => setCreatePassOpen(false)}
+        onOpenPass={(id) => {
+          const found = (entries ?? []).find((e) => e.id === id);
+          if (found) setSelected(found);
+        }}
       />
     </div>
   );

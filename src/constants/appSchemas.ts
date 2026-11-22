@@ -40,6 +40,18 @@ export const DEFAULT_SCHEMAS: Record<string, FieldDef[]> = {
       options: ['Enquiry', 'Confirmed', 'On Hire', 'Off Hire', 'Returned', 'Cancelled'] },
     { key: 'salesRep', label: 'Sales Rep', type: 'text', system: true, order: 12, inTable: false },
   ],
+  crm: [
+    { key: 'number', label: 'Quotation No.', type: 'text', system: true, required: true, order: 0, inTable: true },
+    { key: 'customerName', label: 'Customer', type: 'text', system: true, required: true, order: 1, inTable: true, filterable: true },
+    { key: 'amount', label: 'Amount', type: 'currency', system: true, required: true, order: 2, inTable: true },
+    { key: 'phase', label: 'Phase', type: 'select', system: true, order: 3, inTable: true, filterable: true,
+      options: ['Awaiting', 'Tender', 'Lost', 'Won'] },
+    { key: 'lostReason', label: 'Lost reason', type: 'select', system: true, order: 4, inTable: false,
+      options: ['Price too high', 'Competitor chosen', 'Project cancelled', 'No response', 'Other'] },
+    { key: 'salesRep', label: 'Sales Rep', type: 'text', system: true, order: 5, inTable: true },
+    { key: 'validUntil', label: 'Valid until', type: 'date', system: true, order: 6, inTable: false },
+    { key: 'notes', label: 'Notes', type: 'text', system: true, order: 7, inTable: false },
+  ],
 };
 
 export function defaultSchema(appId: string): FieldDef[] {

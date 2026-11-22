@@ -11,7 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCreateMachine, useUpdateMachine, useBranches } from '@/hooks/useQueries';
+import { useCreateMachine, useUpdateMachine, useBranches, useMachines } from '@/hooks/useQueries';
+import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
+import { findDuplicateFleetNo, type MachineLite } from '@/services/collectionCore';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { Machine } from '@/types';
 
@@ -67,6 +69,8 @@ interface MachineFormDialogProps {
 
 export function MachineFormDialog({ open, onClose, machine }: MachineFormDialogProps) {
   const { data: branches } = useBranches();
+  const { data: machines } = useMachines();
+  const orgId = useAuthStore((s) => s.user?.orgId ?? JA_ORG_ID);
   const createMutation = useCreateMachine();
   const updateMutation = useUpdateMachine();
   const isEditing = !!machine;
@@ -90,8 +94,24 @@ export function MachineFormDialog({ open, onClose, machine }: MachineFormDialogP
   });
 
   const onSubmit = async (data: MachineFormData) => {
+    const fleetNo = data.fleetNo.trim();
+    const dup = findDuplicateFleetNo((machines ?? []).map((m): MachineLite => ({
+        id: m.id,
+        orgId: (m as { orgId?: string }).orgId ?? orgId,
+        fleetNo: m.fleetNo,
+        assetNumber: m.assetNumber,
+      })), {
+      id: machine?.id,
+      orgId,
+      fleetNo,
+      assetNumber: fleetNo,
+    });
+    if (dup) {
+      form.setError('fleetNo', { type: 'validate', message: 'Duplicate fleet number' });
+      return;
+    }
     try {
-      const payload = { ...data, assetNumber: data.fleetNo } as any;
+      const payload = { ...data, fleetNo, assetNumber: fleetNo } as any;
       if (isEditing) {
         await updateMutation.mutateAsync({ id: machine.id, data: payload });
         toastSuccess('Machine updated successfully');
@@ -101,7 +121,11 @@ export function MachineFormDialog({ open, onClose, machine }: MachineFormDialogP
       }
       form.reset();
       onClose();
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'DuplicateFleetNoError') {
+        form.setError('fleetNo', { type: 'validate', message: 'Duplicate fleet number' });
+        return;
+      }
       toastError(isEditing ? 'Failed to update machine' : 'Failed to create machine');
     }
   };

@@ -12,7 +12,12 @@ import { useMachines, useCustomers } from '@/hooks/useQueries';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { Camera } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { JA_ORG_ID, useAuthStore } from '@/store/authStore';
+import { useMqdStore } from '@/store/mqdStore';
+import { signedFiles } from '@/services/signedFiles';
+import { resolveMachineReferences } from '@/services/collectionDocs';
+import type { MqdRecord, ReferenceFields } from '@/types/collection';
 
 // REF-15 Machine Quality Document — exact fields from document
 const mqdSchema = z.object({
@@ -57,6 +62,43 @@ type MQDFormData = z.infer<typeof mqdSchema>;
 interface MQDDialogProps {
   open: boolean;
   onClose: () => void;
+  /** Edit mode: prefill from and patch this record. */
+  record?: MqdRecord;
+  onSaved?: (rec: MqdRecord) => void;
+}
+
+const PHOTO_KEYS = [
+  'photoBodyLeft', 'photoPlatform', 'photoBodyRight', 'photoFrontSteerLeft', 'photoFrontSteerRight',
+  'photoRearDriveLeft', 'photoRearDriveRight', 'photoHourMeter', 'photoCageControls', 'photoFleetSerialReg',
+] as const;
+const TEXT_KEYS = [
+  'leaserNote', 'hirerNote', 'onHireJA', 'onHireHirer', 'onHireDate', 'offHireJA', 'offHireHirer', 'offHireDate',
+] as const;
+
+function defaultsFor(record?: MqdRecord): Partial<MQDFormData> {
+  if (!record) {
+    return { date: new Date().toISOString().split('T')[0], onHireHirerSign: false, offHireHirerSign: false };
+  }
+  const f = record.fields ?? {};
+  const out: Record<string, unknown> = {
+    date: record.date,
+    fleetNo: record.fleetNo,
+    hirer: f.hirerId ?? record.customerId ?? '',
+    onHireHirerSign: f.onHireHirerSign === 'true',
+    offHireHirerSign: f.offHireHirerSign === 'true',
+  };
+  for (const k of TEXT_KEYS) out[k] = f[k] ?? '';
+  return out as Partial<MQDFormData>;
+}
+
+function emptyRefs(note: string): ReferenceFields {
+  return {
+    machineId: '', fleetNo: '', machineDescription: '', serialNumber: '', customerName: '', customerId: '',
+    bookingId: '', bookingRef: '', hireAgreementId: '', hireAgreementNo: '', quotationId: '', quotationNo: '',
+    invoiceId: '', invoiceNo: '', site: '',
+    missing: ['BOOKING', 'AGREEMENT', 'QUOTATION', 'INVOICE'],
+    refNotes: [note],
+  };
 }
 
 // 7 exterior photos (REF-15)
@@ -77,26 +119,78 @@ const identificationPhotos = [
   { key: 'photoFleetSerialReg', label: 'Fleet No. / Serial No. / Reg.', desc: 'Identification labels' },
 ];
 
-export function MQDDialog({ open, onClose }: MQDDialogProps) {
+export function MQDDialog({ open, onClose, record, onSaved }: MQDDialogProps) {
   const { data: machines } = useMachines();
   const { data: customers } = useCustomers();
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<MQDFormData>({
     resolver: zodResolver(mqdSchema),
-    defaultValues: {
-      date:            new Date().toISOString().split('T')[0],
-      onHireHirerSign: false,
-      offHireHirerSign: false,
-    },
+    defaultValues: defaultsFor(record),
   });
+
+  useEffect(() => {
+    if (open) form.reset(defaultsFor(record));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, record?.id]);
 
   const onSubmit = async (data: MQDFormData) => {
     setSubmitting(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('MQD submitted:', data);
+      const orgId = record?.orgId ?? useAuthStore.getState().user?.orgId ?? JA_ORG_ID;
+      const store = useMqdStore.getState();
+      const docId = record?.id ?? store.newId();
+      const customer = customers?.find((c) => c.id === data.hirer);
+      const machine = machines?.find((m) => m.assetNumber === data.fleetNo);
+
+      const fields: Record<string, string> = { ...(record?.fields ?? {}), hirerId: data.hirer };
+      for (const k of TEXT_KEYS) fields[k] = (data[k] as string | undefined) ?? '';
+      fields.onHireHirerSign = String(data.onHireHirerSign);
+      fields.offHireHirerSign = String(data.offHireHirerSign);
+
+      // Save uploaded photos; keep existing keys in edit mode.
+      const photoKeys = [...(record?.photoKeys ?? [])];
+      let n = photoKeys.reduce((mx, k) => Math.max(mx, Number(/photo-(\d+)$/.exec(k)?.[1] ?? 0)), 0);
+      for (const pk of PHOTO_KEYS) {
+        const file = data[pk] as File | undefined;
+        if (!file) continue;
+        n += 1;
+        const ref = await signedFiles.put(`${orgId}/MQD/${docId}/photo-${n}`, file, { name: file.name, mime: file.type });
+        photoKeys.push(ref.key);
+      }
+
+      const hirerName = customer?.name ?? record?.hirer ?? data.hirer;
+      const now = new Date().toISOString();
+      let saved: MqdRecord;
+      if (record) {
+        saved = store.patch(record.id, {
+          date: data.date, fleetNo: data.fleetNo, hirer: hirerName, customerId: data.hirer, fields, photoKeys, updatedAt: now,
+        });
+      } else {
+        const refs =
+          (machine && resolveMachineReferences(machine.id, customer?.name)) ||
+          emptyRefs('No machine matched the selected fleet number');
+        const year = Number(/^(\d{4})/.exec(data.date)?.[1]) || new Date().getFullYear();
+        saved = {
+          ...refs,
+          fleetNo: refs.fleetNo || data.fleetNo,
+          customerName: refs.customerName || customer?.name || '',
+          customerId: refs.customerId || data.hirer,
+          id: docId,
+          orgId,
+          number: store.issueNumber(orgId, year),
+          signedStatus: 'Pending',
+          createdAt: now,
+          updatedAt: now,
+          date: data.date,
+          hirer: hirerName,
+          fields,
+          photoKeys,
+        };
+        store.insert(saved);
+      }
       toastSuccess('MQD completed — condition record saved');
+      onSaved?.(saved);
       form.reset();
       onClose();
     } catch {
@@ -134,7 +228,7 @@ export function MQDDialog({ open, onClose }: MQDDialogProps) {
                 <FormField control={form.control} name="fleetNo" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Fleet No.*</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select fleet no." /></SelectTrigger>
                       </FormControl>
@@ -151,7 +245,7 @@ export function MQDDialog({ open, onClose }: MQDDialogProps) {
                 <FormField control={form.control} name="hirer" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Hirer*</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger><SelectValue placeholder="Select hirer" /></SelectTrigger>
                       </FormControl>

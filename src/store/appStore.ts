@@ -16,10 +16,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { MachineStatus } from '@/types/machine';
+import type { CaptureMethod, TimeSource } from '@/types/gate';
 import { machines as mockMachines } from '@/services/mock/machines';
 import { transportJobs as mockTransportJobs } from '@/services/mock/transport';
 import { gateEntries as mockGateEntries } from '@/services/mock/gate';
 import { breakdowns as mockBreakdowns } from '@/services/mock/breakdowns';
+import { handleOnHire } from '@/services/hireLink';
+import { demoMachineOverrides } from '@/services/mock/demoHireLink';
+import { findLoadedMachine } from '@/services/mock/orgData';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -124,6 +128,14 @@ export interface StoredGateEntry {
   gatePass: string;
   // Link to booking (if OUT for delivery)
   bookingId?: string;
+  timestamp?: string;
+  fleetNo?: string;
+  gateDate?: string;
+  gateTime?: string;
+  gateTimeZone?: string;
+  captureMethod?: CaptureMethod;
+  timeSource?: TimeSource;
+  qrPayload?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -166,7 +178,9 @@ export function getMachineStatus(
   const override = overrides.find(o => o.machineId === machineId);
   if (override) return override.status;
   const mock = mockMachines.find(m => m.id === machineId);
-  return mock?.status ?? 'Available';
+  if (mock) return mock.status;
+  // Any company's own machines (demo or user-created) carry their base status.
+  return findLoadedMachine(machineId)?.status ?? 'Available';
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────
@@ -179,6 +193,7 @@ interface AppState {
   jobCards: StoredJobCard[];
   inspections: StoredInspection[];
   transportJobs: StoredTransportJob[];
+  /** @deprecated Gate records live in useGateStore (src/store/gateStore.ts). Kept so persisted state still loads. */
   gateEntries: StoredGateEntry[];
   breakdowns: StoredBreakdown[];
 
@@ -202,8 +217,11 @@ interface AppState {
   getAllTransportJobs: () => StoredTransportJob[];
 
   // ── Gate Entries ──
+  /** @deprecated Use gateService.create (writes useGateStore). */
   addGateEntry: (ge: StoredGateEntry) => void;
+  /** @deprecated Use gateService.approve / complete (write useGateStore). */
   updateGateEntry: (id: string, data: Partial<StoredGateEntry>) => void;
+  /** @deprecated Use gateService.list (merges useGateStore). */
   getAllGateEntries: () => StoredGateEntry[];
 
   // ── Breakdowns ──
@@ -227,6 +245,9 @@ export const useAppStore = create<AppState>()(
       breakdowns: [],
 
       // ── Machine status ──
+      // NOTE: any future caller that puts a machine On Hire must route through
+      // handleOnHire from '@/services/hireLink' (setMachineStatus already does so below), so the
+      // linked CRM quotation is moved to Won exactly once per event.
       setMachineStatus: (machineId, status, reason, meta = {}) => {
         const now = new Date().toISOString();
         set(state => {
@@ -245,6 +266,9 @@ export const useAppStore = create<AppState>()(
           }
           return { machineOverrides: [...state.machineOverrides, override] };
         });
+        if (status === 'On Hire') {
+          handleOnHire({ source: 'machine', machineId });
+        }
       },
 
       getMachineCurrentStatus: (machineId) => {
@@ -321,6 +345,19 @@ export const useAppStore = create<AppState>()(
         }
       },
     }),
-    { name: 'fleet-app-store-v1' }
+    {
+      name: 'fleet-app-store-v1',
+      // Demo data: add the demo machine statuses that the user has no override for yet.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AppState>;
+        const merged = { ...current, ...p } as AppState;
+        const have = new Set((merged.machineOverrides ?? []).map((o) => o.machineId));
+        merged.machineOverrides = [
+          ...(merged.machineOverrides ?? []),
+          ...demoMachineOverrides.filter((o) => !have.has(o.machineId)) as MachineOverride[],
+        ];
+        return merged;
+      },
+    }
   )
 );

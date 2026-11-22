@@ -1,4 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { mergedMqdList, useMqdRecords, useCollections, type MqdRow } from '@/services/collectionDocs';
+import { ALLOWED_SIGNED_MIME } from '@/services/collectionCore';
+import { downloadBlob, mqdPdf } from '@/services/collectionPdf';
+import { attachSigned, getSignedFile } from '@/services/signedFiles';
+import { toastError } from '@/lib/toast-helper';
+import type { MqdRecord } from '@/types/collection';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -27,7 +34,7 @@ const TYPE_CONFIG: Record<InspectionType, { title: string; description: string; 
   PHI: { title: 'Pre-Hire Inspection', description: 'Complete inspection before machine dispatch to customer', icon: ClipboardCheck },
   PDI: { title: 'Pre-Delivery Inspection', description: 'Quality and regulatory checks before delivery', icon: FileCheck },
   Mandatory: { title: 'Mandatory Checks', description: 'Scheduled mandatory safety inspections', icon: Clock },
-  MQD: { title: 'Maintenance Quality Document', description: 'Quality verification of maintenance work', icon: PenLine },
+  MQD: { title: 'Machine Quality Document', description: 'Quality verification of maintenance work', icon: PenLine },
 };
 
 const RESULT_ICONS: Record<ChecklistItem['result'], React.ComponentType<{ className?: string }>> = {
@@ -62,6 +69,8 @@ export function InspectionPage({ type }: { type: InspectionType }) {
     failed: filtered.filter((i) => i.status === 'Failed').length,
     awaiting: filtered.filter((i) => i.status === 'Awaiting Approval').length,
   }), [filtered]);
+
+  if (type === 'MQD') return <MqdPage mockList={filtered} />;
 
   const columns: Column<Inspection>[] = [
     {
@@ -163,6 +172,172 @@ export function InspectionPage({ type }: { type: InspectionType }) {
       <PDIInspectionDialog open={pdiDialogOpen} onClose={() => setPDIDialogOpen(false)} />
       <MandatoryChecksDialog open={mandatoryDialogOpen} onClose={() => setMandatoryDialogOpen(false)} />
       <MQDDialog open={mqdDialogOpen} onClose={() => setMQDDialogOpen(false)} />
+    </div>
+  );
+}
+
+function MqdPage({ mockList }: { mockList: Inspection[] }) {
+  const config = TYPE_CONFIG.MQD;
+  const records = useMqdRecords();
+  const notes = useCollections();
+  const [params, setParams] = useSearchParams();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<MqdRecord | undefined>(undefined);
+  const [selected, setSelected] = useState<Inspection | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadTarget = useRef<string | null>(null);
+
+  // records/notes are subscriptions that force a re-merge when the stores change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => mergedMqdList(mockList), [mockList, records, notes]);
+
+  const openRecord = (id: string) => {
+    const rec = records.find((r) => r.id === id);
+    if (!rec) return;
+    setEditing(rec);
+    setDialogOpen(true);
+  };
+
+  const idParam = params.get('id');
+  useEffect(() => {
+    if (!idParam) return;
+    const rec = records.find((r) => r.id === idParam);
+    if (rec) {
+      setEditing(rec);
+      setDialogOpen(true);
+    }
+  }, [idParam, records]);
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditing(undefined);
+    if (params.has('id')) {
+      const next = new URLSearchParams(params);
+      next.delete('id');
+      setParams(next, { replace: true });
+    }
+  };
+
+  const download = async (id: string) => {
+    const rec = records.find((r) => r.id === id);
+    if (!rec) return;
+    try {
+      downloadBlob(await mqdPdf(rec), `${rec.number}.pdf`);
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'PDF generation failed');
+    }
+  };
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const id = uploadTarget.current;
+    e.target.value = '';
+    if (!file || !id) return;
+    setFileError(null);
+    setBusy(true);
+    try {
+      await attachSigned('MQD', id, file);
+      toastSuccess('Signed copy attached');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      setFileError(msg);
+      toastError(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const viewSigned = async (id: string) => {
+    try {
+      const blob = await getSignedFile('MQD', id);
+      if (!blob) {
+        toastError('Signed copy not found');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Could not open signed copy');
+    }
+  };
+
+  const columns: Column<MqdRow>[] = [
+    { key: 'reference', header: 'Reference', sortable: true, render: (r) => <span className="font-medium text-foreground">{r.reference}</span> },
+    { key: 'fleetNo', header: 'Fleet No', sortable: true, render: (r) => <span className="text-foreground">{r.fleetNo}</span> },
+    { key: 'hirer', header: 'Hirer', sortable: true, render: (r) => <span className="text-muted-foreground">{r.hirer || '—'}</span> },
+    { key: 'collectionNo', header: 'Collection Note', sortable: true, render: (r) => <span className="text-muted-foreground">{r.collectionNo || '—'}</span> },
+    {
+      key: 'signedStatus', header: 'Signed', sortable: true,
+      render: (r) => r.persisted ? <StatusBadge status={r.signedStatus} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>,
+    },
+    {
+      key: 'actions', header: 'Actions',
+      render: (r) => r.persisted ? (
+        <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button variant="outline" size="sm" onClick={() => openRecord(r.id)}>Edit</Button>
+          <Button variant="outline" size="sm" onClick={() => download(r.id)}>Download MQD PDF</Button>
+          <Button
+            variant="outline" size="sm" disabled={busy}
+            onClick={() => { uploadTarget.current = r.id; fileRef.current?.click(); }}
+          >
+            Upload signed copy
+          </Button>
+          {r.signedStatus === 'Signed' && (
+            <Button variant="outline" size="sm" onClick={() => viewSigned(r.id)}>View signed copy</Button>
+          )}
+        </div>
+      ) : null,
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title={config.title}
+        description={config.description}
+        actions={
+          <Button size="sm" onClick={() => { setEditing(undefined); setDialogOpen(true); }}>
+            <Plus className="mr-1.5 h-4 w-4" /> New MQD
+          </Button>
+        }
+      />
+      {fileError && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{fileError}</p>}
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        accept={ALLOWED_SIGNED_MIME.join(',')}
+        onChange={handleFile}
+        aria-label="Signed copy file"
+      />
+      <DataTable
+        columns={columns}
+        data={rows}
+        searchable
+        searchPlaceholder="Search by reference, fleet no, hirer..."
+        searchKeys={['reference', 'fleetNo', 'hirer', 'collectionNo']}
+        onRowClick={(r) => {
+          if (r.persisted) openRecord(r.id);
+          else setSelected(mockList.find((i) => i.id === r.id) ?? null);
+        }}
+        rowKey={(r) => r.id}
+        pageSize={12}
+      />
+
+      <SlideOver
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected ? selected.reference : ''}
+        description={selected ? `${selected.assetNumber} · ${selected.machineModel}` : ''}
+        width="xl"
+      >
+        {selected && <InspectionDetail inspection={selected} />}
+      </SlideOver>
+
+      <MQDDialog open={dialogOpen} onClose={closeDialog} record={editing} />
     </div>
   );
 }

@@ -28,4 +28,8 @@ export interface Booking extends BaseEntity {
   dailyRate: number;
   totalValue: number;
   notes?: string;
+  /** Owning organisation; absent on legacy records. */
+  orgId?: string;
+  /** Hire Agreement id; absent when unlinked. */
+  hireAgreementId?: string;
 }

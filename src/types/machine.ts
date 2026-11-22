@@ -44,6 +44,7 @@ export interface RepairRecord {
 
 export interface Machine extends BaseEntity {
   assetNumber: string;
+  fleetNo?: string;
   serialNumber: string;
   make: string;
   model: string;
