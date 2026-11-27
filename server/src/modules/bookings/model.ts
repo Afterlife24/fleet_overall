@@ -1,6 +1,11 @@
 import { authorize, type ActionCode, type Principal } from '../../auth/principal.js';
 import type { TxClient } from '../../db/tx.js';
 import { AppError } from '../../errors.js';
+import { ownRecordsOnly } from '../quotations/index.js';
+
+/** SQL: the own-records owner of booking alias  (agreement quotation sales user, or the creator when unlinked). */
+export const BOOKING_OWNER_SQL = `(CASE WHEN b.hire_agreement_id IS NOT NULL THEN (SELECT q.sales_user_id FROM hire_agreements h
+  JOIN quotations q ON q.org_id = h.org_id AND q.id = h.quotation_id WHERE h.id = b.hire_agreement_id) ELSE b.created_by END)`;
 
 export const BOOKING_STATUSES = [
   'Draft', 'Reserved', 'Pending Approval', 'Approved', 'Allocated', 'On Hire', 'Returned', 'Cancelled',
@@ -165,6 +170,10 @@ export async function loadBooking(
   if (!row) throw new AppError('NOT_FOUND', 'Booking not found');
   if (authorize(principal, opts.action ?? 'bookings.read', { orgId: principal.orgId, branchId: row.branch_id }) !== 'allow') {
     throw new AppError('NOT_FOUND', 'Booking not found');
+  }
+  if (ownRecordsOnly(principal)) {
+    const own = await tx.query<{ owner: string | null }>(`SELECT ${BOOKING_OWNER_SQL} AS owner FROM bookings b WHERE b.id = $1`, [id]);
+    if (own.rows[0]?.owner !== principal.userId) throw new AppError('NOT_FOUND', 'Booking not found');
   }
   return row;
 }

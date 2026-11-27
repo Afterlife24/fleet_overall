@@ -30,6 +30,26 @@ interface IdsRow {
 }
 
 /**
+ * Takes the start-hire lock chain (quotation -> agreement -> booking -> machine) without validating or writing.
+ * Gate OUT completion calls this before inserting its movement so both paths lock in the same order.
+ */
+export async function lockStartHireChain(tx: TxClient, bookingId: string): Promise<void> {
+  const b = await tx.query<{ hire_agreement_id: string | null; machine_id: string }>(
+    'SELECT hire_agreement_id, machine_id FROM bookings WHERE id = $1',
+    [bookingId],
+  );
+  const row = b.rows[0];
+  if (!row) return;
+  if (row.hire_agreement_id) {
+    const link = await tx.query<{ quotation_id: string }>('SELECT quotation_id FROM hire_agreements WHERE id = $1', [row.hire_agreement_id]);
+    const quotationId = link.rows[0]?.quotation_id;
+    if (quotationId) await tx.query('SELECT 1 FROM quotations WHERE id = $1 FOR UPDATE', [quotationId]);
+    await tx.query('SELECT 1 FROM hire_agreements WHERE id = $1 FOR UPDATE', [row.hire_agreement_id]);
+  }
+  await tx.query('SELECT 1 FROM bookings WHERE id = $1 FOR UPDATE', [bookingId]);
+  await tx.query('SELECT 1 FROM machines WHERE id = $1 FOR UPDATE', [row.machine_id]);
+}
+/**
  * Starts hire for a booking inside the caller's transaction (the caller commits or rolls back).
  * Lock order follows DATABASE_DESIGN 5.2: quotation -> agreement -> booking -> machine, then everything is
  * re-validated. Throws before writing anything when a rule fails, so nothing is partially applied.

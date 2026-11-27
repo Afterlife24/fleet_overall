@@ -14,6 +14,8 @@ import { getIdempotency, idempotencyMiddleware, runIdempotent } from '../shared/
 import { allocateNumber } from '../shared/numberAllocator.js';
 import { parsePagination, parseSort } from '../shared/pagination.js';
 import { parseIfMatch, versionedUpdate } from '../shared/rowVersion.js';
+import { BOOKING_OWNER_SQL } from '../bookings/model.js';
+import { ownRecordsOnly } from '../quotations/index.js';
 import { loadBooking } from './owners.js';
 
 const Money = Decimal.clone({ precision: 40, rounding: Decimal.ROUND_HALF_UP });
@@ -40,6 +42,10 @@ function listWhere(principal: Principal, filters: Array<[string, string | undefi
   const where: string[] = [];
   const scope = branchScopeClause(principal, 'b.branch_id', params, false);
   if (scope) where.push(scope);
+  if (ownRecordsOnly(principal)) {
+    params.push(principal.userId);
+    where.push(`(${BOOKING_OWNER_SQL}) = $${params.length}`);
+  }
   for (const [column, value] of filters) {
     if (value === undefined) continue;
     params.push(value);
@@ -83,6 +89,10 @@ async function loadScoped<R extends { branch_id: string }>(
   const row = res.rows[0];
   if (!row) throw new AppError('NOT_FOUND', `${spec.label} not found`);
   assertInScope(principal, action, row.branch_id);
+  if (ownRecordsOnly(principal)) {
+    const own = await tx.query<{ owner: string | null }>(`SELECT ${BOOKING_OWNER_SQL} AS owner FROM ${spec.from} WHERE ${spec.alias}.id = $1`, [id]);
+    if (own.rows[0]?.owner !== principal.userId) throw new AppError('NOT_FOUND', ` not found`);
+  }
   return row;
 }
 

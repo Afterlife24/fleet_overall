@@ -4,6 +4,8 @@ import type { Principal } from '../../auth/principal.js';
 import { withTransaction, type TxClient } from '../../db/tx.js';
 import { AppError } from '../../errors.js';
 import { recordAudit } from '../shared/audit.js';
+import { BOOKING_OWNER_SQL } from '../bookings/model.js';
+import { ownRecordsOnly } from '../quotations/index.js';
 import { assertInScope, branchScopeClause } from '../shared/branchScope.js';
 import { nullableText, pick } from '../shared/fields.js';
 import {
@@ -161,6 +163,10 @@ async function loadNote(
   const row = res.rows[0];
   if (!row) throw new AppError('NOT_FOUND', 'Collection note not found');
   assertInScope(principal, opts.action ?? 'collection.read', row.branch_id);
+  if (ownRecordsOnly(principal)) {
+    const own = await tx.query<{ owner: string | null }>(`SELECT ${BOOKING_OWNER_SQL} AS owner FROM ${NOTE_FROM} WHERE cn.id = $1`, [id]);
+    if (own.rows[0]?.owner !== principal.userId) throw new AppError('NOT_FOUND', 'Collection note not found');
+  }
   return row;
 }
 
@@ -398,6 +404,10 @@ export function collectionRouter(): Router {
     const params: unknown[] = [];
     const scope = branchScopeClause(principal, 'b.branch_id', params, false);
     if (scope) where.push(scope);
+    if (ownRecordsOnly(principal)) {
+      params.push(principal.userId);
+      where.push(`(${BOOKING_OWNER_SQL}) = $${params.length}`);
+    }
     const eq = (column: string, value: string | undefined) => {
       if (value === undefined) return;
       params.push(value);

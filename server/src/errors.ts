@@ -122,6 +122,9 @@ export function toErrorBody(
   if (type === 'entity.parse.failed' || type === 'encoding.unsupported' || type === 'charset.unsupported') {
     return make('VALIDATION_ERROR', 'Request body is not valid JSON', { body: 'invalid_json' });
   }
+  if (typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '22003') {
+    return make('VALIDATION_ERROR', 'A numeric value is out of range', { _: 'out_of_range' });
+  }
   if (isDbUnavailable(err)) return make('SERVICE_UNAVAILABLE', 'Service temporarily unavailable', {}, true);
   return make('INTERNAL_ERROR', 'Internal server error');
 }

@@ -536,8 +536,15 @@ interface Amounts {
   totalAmount: string;
 }
 
-function totalsFor(equipmentAmount: string, transportAmount: string, vatRate: string): Amounts {
-  return computeTotals(equipmentAmount, transportAmount, vatRate);
+function totalsFor(equipmentAmount: string, transportAmount: string, vatRate: string, field = 'equipment.amount'): Amounts {
+  const totals = computeTotals(equipmentAmount, transportAmount, vatRate);
+  // numeric(20,6) holds at most 14 integer digits; reject before the insert instead of overflowing in the database.
+  for (const v of [equipmentAmount, transportAmount, totals.subtotal, totals.vatAmount, totals.totalAmount]) {
+    if (new Money(v).abs().gte(new Money(10).pow(14))) {
+      throw new AppError('VALIDATION_ERROR', 'The amount is too large', { [field]: 'out_of_range' });
+    }
+  }
+  return totals;
 }
 
 const AUDIT_FIELDS = [

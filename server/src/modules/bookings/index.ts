@@ -15,9 +15,10 @@ import { allocateNumber } from '../shared/numberAllocator.js';
 import { parsePagination, parseSort } from '../shared/pagination.js';
 import { parseIfMatch, versionedUpdate } from '../shared/rowVersion.js';
 import {
-  BOOKING_COLUMNS, BOOKING_FROM, BOOKING_STATUSES, PLANNING_STATUSES, RESERVING_STATUSES, bookingToDto, loadBooking,
+  BOOKING_COLUMNS, BOOKING_FROM, BOOKING_OWNER_SQL, BOOKING_STATUSES, PLANNING_STATUSES, RESERVING_STATUSES, bookingToDto, loadBooking,
   type BookingDto, type BookingRow, type BookingStatus,
 } from './model.js';
+import { ownRecordsOnly } from '../quotations/index.js';
 import { startHireInTx } from './startHire.js';
 
 export { bookingToDto, loadBooking, type BookingDto } from './model.js';
@@ -279,6 +280,10 @@ export function bookingsRouter(): Router {
       params.push(value);
       where.push(`${column} = $${params.length}`);
     };
+    if (ownRecordsOnly(principal)) {
+      params.push(principal.userId);
+      where.push(`(${BOOKING_OWNER_SQL}) = $${params.length}`);
+    }
     eq('b.machine_id', query.machineId);
     eq('b.customer_id', query.customerId);
     eq('b.branch_id', query.branchId);

@@ -19,13 +19,27 @@ All numbers below are from the final run after the last code change.
 | Suite | Command | Files | Tests | Result |
 |---|---|---|---|---|
 | Frontend | `npx vitest --run` | 79 | 349 | All pass |
-| Server unit/property | `npm run test:server` | 15 | 82 | All pass |
+| Server unit/property | `npm run test:server` | 16 | 85 | All pass |
 
 Optional property tests from the spec were skipped on request.
 
 ## 3. Real-database integration tests (`fleet_test`)
 
-Command: `npm run test:integration`. Result: **23 files, 231 tests, all pass.**
+Command: `npm run test:integration`. Result: **25 files, 256 tests, all pass** (includes the high-risk suite below).
+
+High-risk suite (`highRisk.int.test.ts`, `highRisk.seed.int.test.ts`): untested routes (Delivery Note, HIRE MQD/TPS),
+cross-module races, idempotency key reuse with a different body, file/role authorization edges, decimal/date/length
+edges, and seed re-runs. It first found 5 bugs, all now fixed and passing on three consecutive runs:
+
+| Bug | Fix |
+|---|---|
+| Planner Start Hire racing Gate OUT deadlocked (500) | Same lock order on both paths (`lockStartHireChain`); one automatic retry on deadlock/serialization errors |
+| Collection note left open after Gate IN | Gate IN closes every open collection note of the booking and completes its open auto jobs |
+| Sales executive could read colleagues' booking-linked documents and bookings | Own-records rule applied to bookings and all booking-linked documents |
+| Parallel completion of one gate pass returned an error | Re-reads the movement after taking the lock and returns `alreadyCompleted` |
+| Oversized invoice amount returned 500 | Amounts beyond the column range rejected with 422; numeric overflow mapped to 422 everywhere |
+
+API contract check (`server/tests/unit/apiContract.test.ts`): every frontend API call has a matching server route.
 
 | Required test | Covered by |
 |---|---|
@@ -65,4 +79,3 @@ collection.
 | Real OIDC provider | No issuer/audience/JWKS supplied; tested with locally generated RS256 keys |
 | Real file scanner | No scanner supplied; the verification adapter is the local pass-through |
 | Browser end-to-end (clicking through the UI) | Not automated; screens are covered by component tests with mocked API modules |
-| Delivery Note and HIRE MQD/TPS routes directly | Exercised only through shared code paths; no dedicated integration test yet |

@@ -1,4 +1,4 @@
-﻿import pg from 'pg';
+import pg from 'pg';
 
 /** Query surface handed to work running inside a tenant transaction. */
 export type TxClient = Pick<pg.PoolClient, 'query'>;
@@ -17,7 +17,7 @@ export function setTransactionPool(pool: pg.Pool | undefined): void {
  * `set_config(..., true)` is transaction-scoped, so the context never survives COMMIT/ROLLBACK
  * and cannot leak to the next user of the pooled connection. The client is released in every outcome.
  */
-export async function withTransactionOn<T>(
+async function runOnce<T>(
   pool: pg.Pool,
   orgId: string,
   fn: (tx: TxClient) => Promise<T>,
@@ -41,6 +41,17 @@ export async function withTransactionOn<T>(
     throw err;
   } finally {
     client.release(releaseError);
+  }
+}
+
+/** Retries once when Postgres aborts the transaction with a deadlock (40P01) or serialization failure (40001); the whole transaction rolled back. */
+export async function withTransactionOn<T>(pool: pg.Pool, orgId: string, fn: (tx: TxClient) => Promise<T>): Promise<T> {
+  try {
+    return await runOnce(pool, orgId, fn);
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    if (code !== '40P01' && code !== '40001') throw err;
+    return runOnce(pool, orgId, fn);
   }
 }
 

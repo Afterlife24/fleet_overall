@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authorize, type Principal } from '../../auth/principal.js';
 import { withTransaction, type TxClient } from '../../db/tx.js';
 import { AppError } from '../../errors.js';
-import { startHireInTx } from '../bookings/startHire.js';
+import { lockStartHireChain, startHireInTx } from '../bookings/startHire.js';
 import { recordAudit } from '../shared/audit.js';
 import { assertInScope, assertWritableBranch, branchScopeClause } from '../shared/branchScope.js';
 import { decimal, nullableText, text } from '../shared/fields.js';
@@ -167,8 +167,13 @@ async function loadPass(
     `SELECT ${PASS_SELECT} FROM ${PASS_FROM} WHERE gp.id = $1${opts.lock ? ' FOR UPDATE OF gp' : ''}`,
     [id],
   );
-  const row = res.rows[0];
+  let row = res.rows[0];
   if (!row) throw new AppError('NOT_FOUND', 'Gate pass not found');
+  if (opts.lock) {
+    // The joined movement came from the pre-lock snapshot; re-read it now that the pass lock is held.
+    const fresh = await tx.query<PassRow>(`SELECT ${PASS_SELECT} FROM ${PASS_FROM} WHERE gp.id = $1`, [id]);
+    row = fresh.rows[0] ?? row;
+  }
   assertInScope(principal, opts.action ?? 'gate.read', row.branch_id);
   return row;
 }
@@ -938,6 +943,9 @@ export function gateRouter(): Router {
           closes = out.rows[0]?.id ?? null;
         }
 
+        // Same lock order as the planner Start Hire (quotation -> agreement -> booking -> machine) before any FK-locking insert.
+        if (pass.movement_purpose === 'CUSTOMER_HIRE' && pass.booking_id) await lockStartHireChain(tx, pass.booking_id);
+
         const mv = await tx.query<{ id: string; occurred_at: Date }>(
           `INSERT INTO gate_movements (org_id, gate_pass_id, machine_id, booking_id, direction, operator_user_id, capture_method,
                                        time_source, closes_movement_id, notes, created_by)
@@ -979,6 +987,22 @@ export function gateRouter(): Router {
                       updated_at = now(), updated_by = $4, row_version = row_version + 1
                 WHERE id = $1`,
               [note.id, movementId, occurredAt, principal.userId],
+            );
+          }
+          // The machine is back: every other open note of this booking is collected too, and its open auto job is done.
+          const others = await tx.query<{ id: string }>(
+            `UPDATE collection_notes SET status = 'Collected', collected_movement_id = $2, collected_at = $3,
+                    updated_at = now(), updated_by = $4, row_version = row_version + 1
+              WHERE booking_id = $1 AND status = ANY($5::text[])
+              RETURNING id`,
+            [bk.id, movementId, occurredAt, principal.userId, OPEN_NOTE_STATUSES],
+          );
+          const collectedIds = [...others.rows.map((r) => r.id), ...(pass.collection_note_id ? [pass.collection_note_id] : [])];
+          if (collectedIds.length > 0) {
+            await tx.query(
+              `UPDATE transport_jobs SET status = 'Completed', updated_at = now(), updated_by = $2, row_version = row_version + 1
+                WHERE collection_note_id = ANY($1::uuid[]) AND status NOT IN ('Completed', 'Cancelled')`,
+              [collectedIds, principal.userId],
             );
           }
           const machine = await loadMachineSummary(tx, principal, pass.machine_id, true);
