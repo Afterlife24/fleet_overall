@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GateRecord } from '@/types/gate';
-import { importLegacyGateEntries, migrateGateStoreState, useGateStore } from './gateStore';
+import { GATE_STORE_KEY, migrateGateStoreState, useGateStore } from './gateStore';
 
-const LEGACY_KEY = 'fleet-app-store-v1';
 
 const rec = (id: string, over: Partial<GateRecord> = {}): GateRecord =>
   ({
@@ -49,49 +48,6 @@ describe('gateStore actions', () => {
   });
 });
 
-describe('legacy import', () => {
-  const legacy = (rows: unknown) =>
-    localStorage.setItem(LEGACY_KEY, JSON.stringify({ state: { gateEntries: rows } }));
-
-  it('imports a row without orgId once as org-ja, leaving appStore data unchanged', () => {
-    legacy([{ id: 'old-1', reference: 'GP-1', assetNumber: 'A-9' }]);
-    const before = localStorage.getItem(LEGACY_KEY);
-    importLegacyGateEntries();
-    importLegacyGateEntries();
-    const rows = useGateStore.getState().entries;
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: 'old-1', orgId: 'org-ja' });
-    expect(useGateStore.getState().legacyImported).toBe(true);
-    expect(localStorage.getItem(LEGACY_KEY)).toBe(before);
-  });
-
-  it('does not import again once the flag is set, even for new legacy rows', () => {
-    legacy([{ id: 'old-1' }]);
-    importLegacyGateEntries();
-    legacy([{ id: 'old-1' }, { id: 'old-2' }]);
-    importLegacyGateEntries();
-    expect(useGateStore.getState().entries.map((r) => r.id)).toEqual(['old-1']);
-  });
-
-  it('keeps an existing orgId and skips ids already stored', () => {
-    useGateStore.getState().add(rec('old-1', { orgId: 'org-a' }));
-    legacy([{ id: 'old-1', orgId: 'org-z' }, { id: 'old-2', orgId: 'org-z' }]);
-    importLegacyGateEntries();
-    const rows = useGateStore.getState().entries;
-    expect(rows.map((r) => `${r.id}:${r.orgId}`)).toEqual(['old-1:org-a', 'old-2:org-z']);
-  });
-
-  it.each([['not json'], [JSON.stringify({ state: { gateEntries: 'x' } })]])(
-    'a malformed legacy value does not throw and leaves the flag false (%s)',
-    (raw) => {
-      localStorage.setItem(LEGACY_KEY, raw);
-      expect(() => importLegacyGateEntries()).not.toThrow();
-      expect(useGateStore.getState().legacyImported).toBe(false);
-      expect(useGateStore.getState().entries).toEqual([]);
-    },
-  );
-});
-
 describe('persistence', () => {
   it('records and seed markers survive a rebuild from the serialised state', () => {
     useGateStore.getState().add(rec('1'));
@@ -106,5 +62,31 @@ describe('persistence', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(migrateGateStoreState('junk')).toEqual({ entries: [], seedMarkers: {}, legacyImported: false, counters: {} });
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe('not persisted', () => {
+  it('mutations do not write to localStorage', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    useGateStore.getState().add(rec('1'));
+    useGateStore.getState().upsert(rec('2'));
+    useGateStore.getState().seedOrg('org-a', [rec('s1')]);
+    expect(setItem).not.toHaveBeenCalled();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('removes the old fleet-gate-entries-v1 key when the store loads', async () => {
+    expect(GATE_STORE_KEY).toBe('fleet-gate-entries-v1');
+    localStorage.setItem('fleet-gate-entries-v1', JSON.stringify({ state: { entries: [rec('old')] } }));
+    vi.resetModules();
+    await import('./gateStore');
+    expect(localStorage.getItem('fleet-gate-entries-v1')).toBeNull();
+  });
+
+  it('importLegacyGateEntries is a no-op', async () => {
+    const { importLegacyGateEntries } = await import('./gateStore');
+    localStorage.setItem('fleet-app-store-v1', JSON.stringify({ state: { gateEntries: [{ id: 'x' }] } }));
+    importLegacyGateEntries();
+    expect(useGateStore.getState().entries).toEqual([]);
   });
 });

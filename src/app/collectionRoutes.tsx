@@ -1,9 +1,8 @@
 import { CollectionNotePage } from '@/features/collection/CollectionNotePage';
-import { appCreateTransportJob, appMachineResolver } from '@/features/fleet/collectionWiring';
 
-/** Route wrapper: supplies the machine resolver and transport-job callback. */
+/** Route wrapper for the Collection Note page. */
 export function CollectionNoteRoute() {
-  return <CollectionNotePage machines={appMachineResolver} createTransportJob={appCreateTransportJob} />;
+  return <CollectionNotePage />;
 }
 
 export default CollectionNoteRoute;

@@ -1,14 +1,13 @@
-import type { Booking, BookingStatus } from '@/types';
+import type { BookingCreateDto, BookingPlanningStatus, BookingUpdateDto } from '@/services/api/bookings';
+import type { Booking } from '@/types';
 
 /**
- * Structural shape of the validated booking form values that the builder reads.
- * Any additional form fields (gates, LPO, period, ...) are passed through to the record.
- * BookingFormDialog's inferred form type is assignable to this.
+ * Structural shape of the validated booking form values that the builders read.
+ * Extra form fields (period, time, sales rep, ...) are ignored: the API stores none of them.
  */
 export interface BookingRecordFormData {
   customerId: string;
   machineId: string;
-  branchId: string;
   startDate: string;
   endDate: string;
   deliveryAddress: string;
@@ -17,82 +16,87 @@ export interface BookingRecordFormData {
   dailyRate: number;
   remarks?: string;
   hireAgreementId?: string;
+  lpoId?: string;
+  quoted?: boolean;
+  haSent?: boolean;
+  haReceived?: boolean;
+  reserved?: boolean;
   [extra: string]: unknown;
 }
 
-export interface BuildBookingRecordArgs {
-  mode: 'create' | 'edit';
-  data: BookingRecordFormData;
-  /** Required when mode is 'edit'. */
-  existing?: Booking;
-  /** Active organisation. */
-  orgId: string;
-  /** ISO timestamp. */
-  now: string;
-  names: { customerName: string; assetNumber: string; machineModel: string; branchName: string };
-  status: BookingStatus;
-  totalValue: number;
-  /** Numeric seed for the id and reference (Date.now() in the UI); used on create only. */
-  idSeed: number;
+const blank = (v: string | undefined): string | null => {
+  const t = (v ?? '').trim();
+  return t === '' ? null : t;
+};
+
+/**
+ * The planning status to send. A booking with every gate done and no hold is `Allocated`; anything else only
+ * holds the slot as `Reserved`. `On Hire`, `Returned` and `Cancelled` are never chosen here: they come from
+ * Start Hire, the machine's return and Cancel.
+ */
+export function planningStatus(
+  gates: { quoted?: boolean; haSent?: boolean; haReceived?: boolean; lpoId?: string; reserved?: boolean },
+): BookingPlanningStatus {
+  const complete = !!gates.quoted && !!gates.haSent && !!gates.haReceived && !!blank(gates.lpoId);
+  return gates.reserved || !complete ? 'Reserved' : 'Allocated';
 }
 
-/** Pure builder for the persisted booking record. */
-export function buildBookingRecord(args: BuildBookingRecordArgs): Booking {
-  const { mode, data, existing, orgId, now, names, status, totalValue, idSeed } = args;
-  const seed = String(idSeed);
-
-  // Drop identity keys that must never come from form data, and the agreement field (handled below).
-  const {
-    id: _id,
-    reference: _reference,
-    createdAt: _createdAt,
-    updatedAt: _updatedAt,
-    orgId: _orgId,
-    hireAgreementId: rawAgreement,
-    ...extra
-  } = data as Record<string, unknown>;
-  void _id; void _reference; void _createdAt; void _updatedAt; void _orgId;
-
-  const identity =
-    mode === 'edit' && existing
-      ? {
-          id: existing.id,
-          reference: existing.reference,
-          createdAt: existing.createdAt,
-          orgId: existing.orgId ?? orgId,
-        }
-      : {
-          id: `bk-user-${seed}`,
-          reference: `BK-${new Date(now).getFullYear()}-${seed.slice(-4)}`,
-          createdAt: now,
-          orgId,
-        };
-
-  const record = {
-    customerId: data.customerId,
-    customerName: names.customerName,
+/** Body for `POST /bookings`. */
+export function buildBookingCreate(data: BookingRecordFormData, status: BookingPlanningStatus): BookingCreateDto {
+  return {
     machineId: data.machineId,
-    assetNumber: names.assetNumber,
-    machineModel: names.machineModel,
-    branchId: data.branchId,
-    branchName: names.branchName,
+    customerId: data.customerId,
+    hireAgreementId: blank(data.hireAgreementId),
+    lpoId: blank(data.lpoId),
     startDate: data.startDate,
     endDate: data.endDate,
     status,
-    deliveryAddress: data.deliveryAddress,
-    contactPhone: data.siteContactPhone,
+    deliveryAddress: data.deliveryAddress.trim(),
+    contactPhone: data.siteContactPhone.trim(),
     operatorRequired: data.operatorRequired,
-    dailyRate: data.dailyRate,
-    totalValue,
-    notes: data.remarks ?? '',
-    ...extra,
-    ...identity,
-    updatedAt: now,
-  } as unknown as Booking;
+    dailyRate: String(data.dailyRate),
+    quoted: !!data.quoted,
+    haSent: !!data.haSent,
+    haReceived: !!data.haReceived,
+    reserved: !!data.reserved,
+    notes: blank(data.remarks),
+  };
+}
 
-  const agreementId = typeof rawAgreement === 'string' ? rawAgreement.trim() : '';
-  if (agreementId) record.hireAgreementId = agreementId;
-  else delete record.hireAgreementId;
+/**
+ * Body for `PATCH /bookings/:id`: only the fields that differ from the loaded booking. The status is left out for
+ * a booking that is already On Hire (its status changes only by return).
+ */
+export function buildBookingUpdate(
+  data: BookingRecordFormData,
+  status: BookingPlanningStatus,
+  existing: Booking,
+): BookingUpdateDto {
+  const patch: BookingUpdateDto = {};
+  if (data.machineId !== existing.machineId) patch.machineId = data.machineId;
+  const agreement = blank(data.hireAgreementId);
+  if (agreement !== (existing.hireAgreementId ?? null)) patch.hireAgreementId = agreement;
+  const lpo = blank(data.lpoId);
+  if (lpo !== (existing.lpoId ?? null)) patch.lpoId = lpo;
+  if (data.startDate !== existing.startDate) patch.startDate = data.startDate;
+  if (data.endDate !== existing.endDate) patch.endDate = data.endDate;
+  if (existing.status !== 'On Hire' && status !== existing.status) patch.status = status;
+  if (data.deliveryAddress.trim() !== existing.deliveryAddress) patch.deliveryAddress = data.deliveryAddress.trim();
+  if (data.siteContactPhone.trim() !== existing.contactPhone) patch.contactPhone = data.siteContactPhone.trim();
+  if (data.operatorRequired !== existing.operatorRequired) patch.operatorRequired = data.operatorRequired;
+  if (Number(data.dailyRate) !== existing.dailyRate) patch.dailyRate = String(data.dailyRate);
+  if (!!data.quoted !== !!existing.quoted) patch.quoted = !!data.quoted;
+  if (!!data.haSent !== !!existing.haSent) patch.haSent = !!data.haSent;
+  if (!!data.haReceived !== !!existing.haReceived) patch.haReceived = !!data.haReceived;
+  if (!!data.reserved !== !!existing.reserved) patch.reserved = !!data.reserved;
+  const notes = blank(data.remarks);
+  if (notes !== (existing.notes ?? null)) patch.notes = notes;
+  return patch;
+}
 
-  return record;
+/** What the planner shows for a booking: the server status, with Returned only when the server says it returned. */
+export function displayStatus(b: Pick<Booking, 'status' | 'returnedAt' | 'physicallyOccupied' | 'endDate'>, today: string): string {
+  if (b.returnedAt) return 'Returned';
+  if (b.status === 'On Hire' && b.physicallyOccupied && b.endDate < today) return 'On Hire (overdue)';
+  return b.status;
 }

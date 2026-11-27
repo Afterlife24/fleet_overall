@@ -136,7 +136,7 @@ function resetWorld(phase: QuotationPhase) {
   useOrgStore.setState({ installedApps: {} });
   useAppStore.setState({ machineOverrides: [] });
   useBookingStore.setState({ userBookings: [makeBooking()] });
-  useHireAgreementStore.setState({ agreements: [makeAgreement()], seededOrgs: [JA_ORG_ID] });
+  useHireAgreementStore.setState({ agreements: [makeAgreement()] });
   useCrmStore.setState({ quotations: [makeQuotation(phase)] });
 }
 

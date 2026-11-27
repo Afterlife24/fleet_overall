@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useTransportJobs } from '@/hooks/useQueries';
-import { useBranchFilter } from '@/hooks/useBranchFilter';
+import { ApiErrorNotice, ApiSessionGate } from '@/components/common/ApiStatus';
+import { LoadingState } from '@/components/common/EmptyState';
+import { useTransportJobViews } from '@/hooks/api/useTransportApi';
 import { cn } from '@/lib/utils';
 import { Download, TrendingDown, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
@@ -25,8 +26,17 @@ interface TripRow {
 }
 
 export function TripbaseReportPage() {
-  const { data: allJobs } = useTransportJobs();
-  const jobs = useBranchFilter(allJobs);
+  return (
+    <ApiSessionGate>
+      <TripbaseReport />
+    </ApiSessionGate>
+  );
+}
+
+function TripbaseReport() {
+  const jobsQuery = useTransportJobViews();
+  // The server already limits the list to the branches this user may see.
+  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -85,6 +95,9 @@ export function TripbaseReportPage() {
 
   const profitableCount = rows.filter((r) => r.profitLoss > 0).length;
   const lossCount = rows.filter((r) => r.profitLoss < 0).length;
+
+  if (jobsQuery.isLoading) return <LoadingState />;
+  if (jobsQuery.isError) return <ApiErrorNotice error={jobsQuery.error} onRetry={jobsQuery.refetch} />;
 
   return (
     <div className="space-y-5">

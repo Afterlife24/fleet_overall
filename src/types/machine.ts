@@ -52,6 +52,8 @@ export interface Machine extends BaseEntity {
   status: MachineStatus;
   branchId: ID;
   branchName: string;
+  /** API machine model id; set on records read from the API. */
+  modelId?: string;
   powerSource: PowerSource;
   platformHeight: number;
   workingHeight: number;

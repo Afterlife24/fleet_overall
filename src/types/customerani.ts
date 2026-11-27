@@ -2,7 +2,7 @@
  * Customer (formerly ANI) — full customer master record.
  */
 
-export type CustomerANIStatus = 'Active' | 'Inactive' | 'Suspended';
+export type CustomerANIStatus = 'Active' | 'Inactive' | 'Suspended' | 'Blacklisted';
 
 export interface CustomerANI {
   id: string;
@@ -27,6 +27,10 @@ export interface CustomerANI {
   contactNumber: string;
   status: CustomerANIStatus;
   branchName: string;
+  /** API branch id; set on records read from the API. */
+  branchId?: string;
+  /** Set on records read from the API; sent back as If-Match on update. */
+  rowVersion?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;

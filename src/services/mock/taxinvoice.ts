@@ -3,7 +3,7 @@ import { hireAgreements } from './hireagreement';
 
 /**
  * Demo tax invoices, one per hire agreement HA-2026-001..004. HA-2026-005 (MNO) is billed by the
- * linked sample invoice QT-2026-0010/01 instead (see demoHireLink.ts), so it has no row here.
+ * linked sample invoice QT-2026-0010/01 instead, so it has no row here.
  * Continuous Hire rows bill the first month of the hire; the Off-Hire row is the final invoice of a
  * hire that has ended (invoice date = hire end date).
  *

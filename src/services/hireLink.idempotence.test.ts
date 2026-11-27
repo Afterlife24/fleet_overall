@@ -99,14 +99,12 @@ function resetWorld(phase: QuotationPhase) {
   useAuthStore.setState({ user: null, isAuthenticated: false });
   useOrgStore.setState({ installedApps: {} });
   useBookingStore.setState({ userBookings: [makeBooking()] });
-  useHireAgreementStore.setState({ agreements: [makeAgreement()], seededOrgs: [JA_ORG_ID] });
+  useHireAgreementStore.setState({ agreements: [makeAgreement()] });
   useCrmStore.setState({ quotations: [makeQuotation(phase)] });
 }
 
 async function rehydrateAll() {
-  await useCrmStore.persist.rehydrate();
-  await useBookingStore.persist.rehydrate();
-  await useHireAgreementStore.persist.rehydrate();
+  // the booking store is an in-memory mirror; there is nothing to rehydrate
 }
 
 function fire(path: Step['path']): HireLinkResult {

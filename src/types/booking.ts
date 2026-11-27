@@ -32,4 +32,19 @@ export interface Booking extends BaseEntity {
   orgId?: string;
   /** Hire Agreement id; absent when unlinked. */
   hireAgreementId?: string;
+  // Fields below come from the bookings API (absent on records built elsewhere).
+  agreementNo?: string;
+  fleetNo?: string;
+  lpoId?: string;
+  quoted?: boolean;
+  haSent?: boolean;
+  haReceived?: boolean;
+  reserved?: boolean;
+  onHireAt?: string | null;
+  departedAt?: string | null;
+  offHireRequestedAt?: string | null;
+  collectedAt?: string | null;
+  /** Set by the server when the machine came back; the only source of the Returned state. */
+  returnedAt?: string | null;
+  physicallyOccupied?: boolean;
 }

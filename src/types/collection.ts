@@ -1,5 +1,6 @@
 export type DocType = 'CN' | 'MQD' | 'TPS';
-export type CollectionStatus = 'Draft' | 'Scheduled' | 'Collected' | 'Closed';
+export type CollectionStatus = 'Draft' | 'Scheduled' | 'Picked Up' | 'Collected' | 'Closed' | 'Cancelled';
+export type ReportPhase = 'HIRE' | 'COLLECTION';
 export type SignedStatus = 'Pending' | 'Signed';
 export type ServiceType = 'Transport' | 'Crane' | 'Escort' | 'Inspection' | 'Cleaning' | 'Other';
 export const SERVICE_TYPES: readonly ServiceType[] =
@@ -46,6 +47,8 @@ interface DocBase extends ReferenceFields {
   signedFile?: SignedFileRef;
   createdAt: string;
   updatedAt: string;
+  /** Server row version (If-Match). Absent on rows that were not read from the API. */
+  rowVersion?: number;
 }
 
 export interface CollectionNote extends DocBase {
@@ -61,6 +64,9 @@ export interface CollectionNote extends DocBase {
   collectedByGateRef?: string;
   /** Gate_Record timestamp, ISO UTC. */
   collectedAt?: string;
+  scheduledCollectionAt?: string;
+  pickedUpAt?: string;
+  relatedInvoiceId?: string;
 }
 
 export interface MqdRecord extends DocBase {
@@ -68,6 +74,7 @@ export interface MqdRecord extends DocBase {
   hirer: string;
   fields: Record<string, string>;
   photoKeys: string[];
+  phase?: ReportPhase;
 }
 
 export interface ServiceLine {
@@ -86,5 +93,7 @@ export interface TpsDocument extends DocBase {
   notes: string;
   approvedBy: string;
   signature: string;
+  phase?: ReportPhase;
+  currencyCode?: string;
 }
 

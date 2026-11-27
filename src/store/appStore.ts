@@ -22,7 +22,7 @@ import { transportJobs as mockTransportJobs } from '@/services/mock/transport';
 import { gateEntries as mockGateEntries } from '@/services/mock/gate';
 import { breakdowns as mockBreakdowns } from '@/services/mock/breakdowns';
 import { handleOnHire } from '@/services/hireLink';
-import { demoMachineOverrides } from '@/services/mock/demoHireLink';
+import { useBookingStore } from '@/store/bookingStore';
 import { findLoadedMachine } from '@/services/mock/orgData';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -217,11 +217,11 @@ interface AppState {
   getAllTransportJobs: () => StoredTransportJob[];
 
   // ── Gate Entries ──
-  /** @deprecated Use gateService.create (writes useGateStore). */
+  /** @deprecated Gate passes live on the backend; use hooks/api/useGateApi.ts. */
   addGateEntry: (ge: StoredGateEntry) => void;
-  /** @deprecated Use gateService.approve / complete (write useGateStore). */
+  /** @deprecated Gate passes live on the backend; use hooks/api/useGateApi.ts. */
   updateGateEntry: (id: string, data: Partial<StoredGateEntry>) => void;
-  /** @deprecated Use gateService.list (merges useGateStore). */
+  /** @deprecated Gate passes live on the backend; use hooks/api/useGateApi.ts. */
   getAllGateEntries: () => StoredGateEntry[];
 
   // ── Breakdowns ──
@@ -325,14 +325,9 @@ export const useAppStore = create<AppState>()(
 
       // ── Workflow Helper ──
       getActiveBookingForMachine: (machineId) => {
-        // import inline to avoid circular deps — reads from bookingStore via localStorage
+        // reads the in-memory booking mirror (filled from the bookings API)
         try {
-          const raw = localStorage.getItem('fleet-bookings-v1');
-          if (!raw) return undefined;
-          const parsed = JSON.parse(raw);
-          const allBookings: any[] = [
-            ...(parsed?.state?.userBookings ?? []),
-          ];
+          const allBookings: any[] = [...useBookingStore.getState().userBookings];
           const today = new Date().toISOString().split('T')[0];
           return allBookings.find(b =>
             b.machineId === machineId &&
@@ -347,17 +342,6 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'fleet-app-store-v1',
-      // Demo data: add the demo machine statuses that the user has no override for yet.
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<AppState>;
-        const merged = { ...current, ...p } as AppState;
-        const have = new Set((merged.machineOverrides ?? []).map((o) => o.machineId));
-        merged.machineOverrides = [
-          ...(merged.machineOverrides ?? []),
-          ...demoMachineOverrides.filter((o) => !have.has(o.machineId)) as MachineOverride[],
-        ];
-        return merged;
-      },
     }
   )
 );

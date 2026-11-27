@@ -33,7 +33,7 @@ function resetStores(): void {
   useOrgStore.setState(initialOrgState, true);
   useAuthStore.setState({ user: null, isAuthenticated: false });
   useBookingStore.setState({ userBookings: [] });
-  useHireAgreementStore.setState({ agreements: [], seededOrgs: [JA_ORG_ID, OTHER_ORG] });
+  useHireAgreementStore.setState({ agreements: [] });
   useCrmStore.setState({ quotations: [] });
 }
 

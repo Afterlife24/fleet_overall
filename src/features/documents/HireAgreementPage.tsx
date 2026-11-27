@@ -3,33 +3,30 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { LoadingState, ErrorState } from '@/components/common/EmptyState';
-import { useHireAgreements, useCreateHireAgreement, useUpdateHireAgreement, useDeleteHireAgreement, useCustomerANIs, useQuotationOptions } from '@/hooks/useQueries';
-import { HireLinkValidationError, HireAgreementInUseError } from '@/services/hireLink';
-import { useAuthStore } from '@/store/authStore';
+import { LoadingState } from '@/components/common/EmptyState';
+import { ApiErrorNotice, ApiSessionGate, describeApiError, errorText } from '@/components/common/ApiStatus';
+import {
+  fetchAgreement, useCreateAgreement, useCrmData, useCustomerRecords, useSubmission, useUpdateAgreement,
+} from '@/hooks/useApiResources';
+import { agreementFromDto } from '@/services/api/mappers';
+import { HireAgreementInUseError, findAllocationsForAgreement } from '@/services/hireLink';
+import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
 import { useOrgStore } from '@/store/orgStore';
 import type { HireAgreement } from '@/types/hireagreement';
+import type { HireAgreementCreateDto, HireAgreementUpdateDto } from '../../../shared/dto/index';
 import type { CustomerANI } from '@/types/customerani';
 import { cn } from '@/lib/utils';
 import { Plus, Download, ArrowLeft, FileText, Trash2 } from 'lucide-react';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 
 
-function calcTotals(monthly: number, transport: number) {
-  const subtotal = monthly + transport;
-  const vat = Math.round(subtotal * 0.05 * 100) / 100;
-  const total = Math.round((subtotal + vat) * 100) / 100;
-  return { subtotal, vat, total };
-}
-
 function formatMoney(n: number) {
   return n.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function emptyForm(org: { name?: string; tradeLicense?: string; companyTrn?: string; companyAddress?: string; companyPhone?: string; companyEmail?: string } | undefined, seq: number): Partial<HireAgreement> {
-  const year = new Date().getFullYear();
+function emptyForm(org: { name?: string; tradeLicense?: string; companyTrn?: string; companyAddress?: string; companyPhone?: string; companyEmail?: string } | undefined): Partial<HireAgreement> {
   return {
-    agreementNo: `HA-${year}-${String(seq).padStart(3, '0')}`,
+    agreementNo: '',
     date: new Date().toISOString().slice(0, 10),
     status: 'Draft',
     lessorName: org?.name ?? '',
@@ -62,60 +59,69 @@ const TERMS = (lessor: string, customer: string) => [
   `Both parties agree to comply with applicable laws and regulations of the United Arab Emirates.`,
 ];
 
+/** Hire Agreement screen. Reads and writes `/api/v1/hire-agreements`; totals and snapshots come from the server. */
 export function HireAgreementPage() {
-  const { data: agreements, isLoading, isError, refetch } = useHireAgreements();
-  const { data: customers } = useCustomerANIs();
-  const createMutation = useCreateHireAgreement();
-  const updateMutation = useUpdateHireAgreement();
-  const deleteMutation = useDeleteHireAgreement();
+  return (
+    <ApiSessionGate>
+      <HireAgreementScreen />
+    </ApiSessionGate>
+  );
+}
+
+function HireAgreementScreen() {
+  const crm = useCrmData();
+  const customerQuery = useCustomerRecords();
+  const createMutation = useCreateAgreement();
+  const updateMutation = useUpdateAgreement();
+  const submission = useSubmission();
+
+  const agreements = crm.data?.agreements;
+  const customers = customerQuery.data ?? [];
+  const isLoading = crm.isLoading;
 
   const user = useAuthStore((s) => s.user);
+  const orgId = user?.orgId ?? JA_ORG_ID;
   const getOrg = useOrgStore((s) => s.getOrg);
+  const crmActive = useOrgStore((s) => s.isAppActive(orgId, 'crm'));
   const org = user ? getOrg(user.orgId) : undefined;
 
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editRecord, setEditRecord] = useState<Partial<HireAgreement> | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const [saveError, setSaveError] = useState<unknown>(null);
+  const [reloading, setReloading] = useState(false);
 
   // Form field state
   const [form, setForm] = useState<Partial<HireAgreement>>({});
-  const { data: quotationOptionsData } = useQuotationOptions(form.customerName ?? '');
-  const quotationOptions = quotationOptionsData ?? { active: true, options: [] };
+  const quotationOptions = {
+    active: crmActive,
+    options: (crm.data?.quotations ?? []).filter((q) => !!form.customerName && q.customerName === form.customerName),
+  };
+  const customerMap = new Map(customers.map((c) => [c.id, { code: c.customerId, name: c.customerName }]));
+  const isEditing = !!editRecord?.id;
 
   const openNew = () => {
-    const seq = ((agreements as HireAgreement[] | undefined)?.length ?? 0) + 1;
-    setForm(emptyForm(org, seq));
+    setForm(emptyForm(org));
     setEditRecord(null);
+    setSaveError(null);
     setView('form');
   };
 
   const openEdit = (rec: HireAgreement) => {
     setForm({ ...rec });
     setEditRecord(rec);
+    setSaveError(null);
     setView('form');
   };
 
   const setField = <K extends keyof HireAgreement>(key: K, val: HireAgreement[K]) => {
-    setForm((prev) => {
-      const next = { ...prev, [key]: val };
-      // recalculate totals when rental or transport changes
-      if (key === 'monthlyRental' || key === 'transportationCharges') {
-        const { subtotal, vat, total } = calcTotals(
-          key === 'monthlyRental' ? (val as number) : (prev.monthlyRental ?? 0),
-          key === 'transportationCharges' ? (val as number) : (prev.transportationCharges ?? 0)
-        );
-        return { ...next, subtotal, vat, totalAmount: total };
-      }
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [key]: val }));
   };
 
   // Auto-fill when Customer Name is selected from dropdown
   const handleCustomerNameSelect = (name: string) => {
-    const match = (customers as CustomerANI[] ?? []).find(
-      (c) => c.customerName === name
-    );
+    const match = customers.find((c) => c.customerName === name);
     if (match) {
       setForm((prev) => ({
         ...prev,
@@ -127,6 +133,7 @@ export function HireAgreementPage() {
         contactNumber: match.contactNumber,
         customerEmail: match.email ?? '',
         billingAddress: match.billingAddress ?? match.address,
+        quotationId: '',
       }));
     } else {
       setField('customerName', name);
@@ -136,9 +143,7 @@ export function HireAgreementPage() {
   // Auto-fill customer details when Customer ID changes
   const handleCustomerIdChange = (id: string) => {
     setField('customerId', id);
-    const match = (customers as CustomerANI[] ?? []).find(
-      (c) => c.customerId.toLowerCase() === id.toLowerCase()
-    );
+    const match = customers.find((c) => c.customerId.toLowerCase() === id.toLowerCase());
     if (match) {
       setForm((prev) => ({
         ...prev,
@@ -150,24 +155,87 @@ export function HireAgreementPage() {
         contactNumber: match.contactNumber,
         customerEmail: match.email ?? '',
         billingAddress: match.billingAddress ?? match.address,
+        quotationId: '',
       }));
     }
   };
 
+  const equipmentFields = (): HireAgreementUpdateDto => ({
+    agreementDate: form.date || undefined,
+    equipmentName: form.equipmentName ?? '',
+    equipmentModel: form.equipmentModel ?? '',
+    serialNumber: form.serialNumber ?? '',
+    quantity: Number(form.quantity ?? 1),
+    capacity: form.capacity ?? '',
+    workingHeight: form.workingHeight ?? '',
+    deliveryLocation: form.deliveryLocation ?? '',
+    hireStartDate: form.hireStartDate ?? '',
+    hireEndDate: form.hireEndDate ?? '',
+    hireDuration: form.hireDuration ?? '',
+    monthlyRental: String(form.monthlyRental ?? 0),
+    transportationCharges: String(form.transportationCharges ?? 0),
+    paymentTerms: form.paymentTerms ?? '',
+    securityDeposit: String(form.securityDeposit ?? 0),
+    paymentMethod: form.paymentMethod ?? '',
+  });
+
+  const showSaved = (dto: Parameters<typeof agreementFromDto>[0]) => {
+    // The totals and snapshots shown are the server's, not a client calculation.
+    const saved = agreementFromDto(dto, { orgId, customers: customerMap });
+    setForm({ ...saved });
+    setEditRecord(saved);
+  };
+
   const handleSave = async () => {
+    setSaveError(null);
     try {
       if (editRecord?.id) {
-        await updateMutation.mutateAsync({ id: editRecord.id, data: { ...form, status: form.status ?? 'Active' } });
+        const dto = await updateMutation.mutateAsync({
+          id: editRecord.id, rowVersion: editRecord.rowVersion ?? 0,
+          patch: { ...equipmentFields(), status: form.status ?? 'Active' },
+        });
+        showSaved(dto);
         toastSuccess('Agreement saved');
       } else {
-        await createMutation.mutateAsync({ ...form, status: 'Active' });
+        const quotationId = form.quotationId ?? '';
+        const customerUuid = crm.data?.quotationCustomerIds.get(quotationId);
+        if (!quotationId || !customerUuid) {
+          setSaveError(new Error('Select a customer and one of their quotations before saving.'));
+          return;
+        }
+        const body: HireAgreementCreateDto = {
+          ...(equipmentFields() as Omit<HireAgreementCreateDto, 'quotationId' | 'customerId'>),
+          quotationId, customerId: customerUuid, status: 'Active',
+        };
+        const dto = await createMutation.mutateAsync({ body, submissionId: submission.id() });
+        submission.renew();
+        showSaved(dto);
         toastSuccess('Agreement created');
       }
-      setView('list');
     } catch (err) {
-      toastError(err instanceof HireLinkValidationError ? err.message : 'Could not save agreement');
+      // The form keeps every entered value.
+      setSaveError(err);
     }
   };
+
+  const reloadEditRecord = async () => {
+    if (!editRecord?.id) return;
+    setReloading(true);
+    try {
+      const latest = await fetchAgreement(editRecord.id);
+      // Only the row version is refreshed; what the user typed stays in the form.
+      setEditRecord((cur) => (cur ? { ...cur, rowVersion: latest.rowVersion } : cur));
+      setSaveError(null);
+    } catch (err) {
+      setSaveError(err);
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  const existingForQuotation = describeApiError(saveError).code === 'AGREEMENT_EXISTS'
+    ? (agreements ?? []).find((a) => a.quotationId === form.quotationId && a.status !== 'Cancelled')
+    : undefined;
 
   const handleDownload = () => {
     setIsPrinting(true);
@@ -177,13 +245,20 @@ export function HireAgreementPage() {
     }, 100);
   };
 
-  const handleDelete = (id: string) => {
-    deleteMutation.mutate(id, {
-      onSuccess: () => toastSuccess('Agreement deleted'),
-      onError: (err) => {
-        toastError(err instanceof HireAgreementInUseError ? err.message : 'Could not delete agreement');
+  /** Agreements are cancelled, never deleted. Planner bookings that still reference one block the cancel. */
+  const handleCancel = (rec: HireAgreement) => {
+    const refs = findAllocationsForAgreement(rec.id);
+    if (refs.length > 0) {
+      toastError(new HireAgreementInUseError(refs).message);
+      return;
+    }
+    updateMutation.mutate(
+      { id: rec.id, rowVersion: rec.rowVersion ?? 0, patch: { status: 'Cancelled' } },
+      {
+        onSuccess: () => toastSuccess('Agreement cancelled'),
+        onError: (err) => { toastError(errorText(err)); void crm.refetch(); },
       },
-    });
+    );
   };
 
   const listColumns: Column<HireAgreement>[] = [
@@ -203,14 +278,14 @@ export function HireAgreementPage() {
       render: (r) => (
         <div className="flex gap-1">
           <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={(e) => { e.stopPropagation(); openEdit(r); }}>Edit</Button>
-          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700" onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}>
+          <Button size="sm" variant="outline" className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700" title="Cancel agreement" disabled={r.status === 'Cancelled'} onClick={(e) => { e.stopPropagation(); handleCancel(r); }}>
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       )},
   ];
 
-  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (crm.isError) return <ApiErrorNotice error={crm.error} onRetry={() => void crm.refetch()} />;
 
   if (view === 'list') {
     return (
@@ -265,6 +340,17 @@ export function HireAgreementPage() {
         </div>
       </div>
 
+      {saveError != null && (
+        <div className="mx-auto max-w-4xl space-y-2 print:hidden">
+          <ApiErrorNotice error={saveError} onReload={() => void reloadEditRecord()} reloading={reloading} />
+          {existingForQuotation && (
+            <Button size="sm" variant="outline" onClick={() => openEdit(existingForQuotation)}>
+              Open existing agreement {existingForQuotation.agreementNo}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* ── THE PRINTABLE / FORM DOCUMENT ────────────────────────────────── */}
       <div
         ref={printRef}
@@ -293,7 +379,8 @@ export function HireAgreementPage() {
                 <input
                   className="print:border-none border-b border-gray-300 bg-transparent text-xs w-32 focus:outline-none print:w-auto"
                   value={f.agreementNo ?? ''}
-                  onChange={(e) => setField('agreementNo', e.target.value)}
+                  readOnly
+                  placeholder="Allocated on save"
                 />
               </p>
               <p className="mt-1"><span className="font-semibold">Date:</span>{' '}
@@ -308,10 +395,10 @@ export function HireAgreementPage() {
                 <select
                   className="border-b border-gray-300 bg-transparent text-xs w-48 focus:outline-none disabled:opacity-60"
                   value={f.quotationId ?? ''}
-                  disabled={!quotationOptions.active}
+                  disabled={!quotationOptions.active || isEditing}
                   onChange={(e) => setField('quotationId', e.target.value)}
                 >
-                  <option value="">— None —</option>
+                  <option value="">— Select —</option>
                   {quotationOptions.options.map((q) => (
                     <option key={q.id} value={q.id}>{q.number} · {q.opportunity} · {q.phase}</option>
                   ))}
@@ -353,7 +440,8 @@ export function HireAgreementPage() {
                       <input
                         className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
                         value={String(f[key] ?? '')}
-                        onChange={(e) => setField(key, e.target.value as any)}
+                        readOnly
+                        title="Snapshot taken by the server when the agreement is saved"
                         placeholder={placeholder || label}
                       />
                     </td>
@@ -383,6 +471,7 @@ export function HireAgreementPage() {
                     <select
                       className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
                       value={f.customerName ?? ''}
+                      disabled={isEditing}
                       onChange={(e) => handleCustomerNameSelect(e.target.value)}
                     >
                       <option value="">— Select Customer —</option>
@@ -399,6 +488,7 @@ export function HireAgreementPage() {
                     <input
                       className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
                       value={f.customerId ?? ''}
+                      readOnly={isEditing}
                       onChange={(e) => handleCustomerIdChange(e.target.value)}
                       placeholder="Auto-filled from Customer Name…"
                       list="customer-id-list"
@@ -424,7 +514,8 @@ export function HireAgreementPage() {
                       <input
                         className="w-full border-b border-gray-300 bg-transparent focus:outline-none print:border-none"
                         value={String(f[key] ?? '')}
-                        onChange={(e) => setField(key, e.target.value as any)}
+                        readOnly
+                        title="Snapshot taken by the server when the agreement is saved"
                         placeholder={label}
                       />
                     </td>
@@ -513,15 +604,15 @@ export function HireAgreementPage() {
                 </tr>
                 <tr className="bg-gray-50">
                   <td className="border border-gray-200 px-3 py-1.5">Subtotal</td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium">{formatMoney(f.subtotal ?? 0)}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-medium" data-testid="agreement-subtotal">{isEditing ? formatMoney(f.subtotal ?? 0) : '—'}</td>
                 </tr>
                 <tr>
-                  <td className="border border-gray-200 px-3 py-1.5">VAT (5%)</td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right">{formatMoney(f.vat ?? 0)}</td>
+                  <td className="border border-gray-200 px-3 py-1.5">VAT</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right" data-testid="agreement-vat">{isEditing ? formatMoney(f.vat ?? 0) : '—'}</td>
                 </tr>
                 <tr className="bg-blue-50">
                   <td className="border border-gray-200 px-3 py-1.5 font-bold text-blue-800">TOTAL AMOUNT</td>
-                  <td className="border border-gray-200 px-3 py-1.5 text-right font-bold text-blue-800">{formatMoney(f.totalAmount ?? 0)}</td>
+                  <td className="border border-gray-200 px-3 py-1.5 text-right font-bold text-blue-800" data-testid="agreement-total">{isEditing ? formatMoney(f.totalAmount ?? 0) : '—'}</td>
                 </tr>
               </tbody>
             </table>

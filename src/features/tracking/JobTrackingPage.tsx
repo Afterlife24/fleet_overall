@@ -5,10 +5,13 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { StageTracker } from '@/components/common/StageTracker';
 import { Timeline } from '@/components/common/Timeline';
 import { LoadingState, EmptyState } from '@/components/common/EmptyState';
-import { useWorkshopJobs, useTransportJobs } from '@/hooks/useQueries';
+import { useWorkshopJobs } from '@/hooks/useQueries';
+import { useTransportJobViews } from '@/hooks/api/useTransportApi';
+import { ApiErrorNotice, ApiSessionGate } from '@/components/common/ApiStatus';
 import { useBranchFilter } from '@/hooks/useBranchFilter';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/utils/format';
+import { ref13Rows } from '@/services/transportCore';
 import { Wrench, Truck, MapPin, User, Search, PackageSearch } from 'lucide-react';
 import { TimelineEvent } from '@/types/common';
 
@@ -49,15 +52,16 @@ export function JobTrackingPage() {
         </button>
       </div>
 
-      {mode === 'transport' ? <TransportTracking /> : <WorkshopTracking />}
+      {mode === 'transport' ? <ApiSessionGate><TransportTracking /></ApiSessionGate> : <WorkshopTracking />}
     </div>
   );
 }
 
 // ── Transport tracking ────────────────────────────────────────────────────────
 function TransportTracking() {
-  const { data: allJobs, isLoading } = useTransportJobs();
-  const jobs = useBranchFilter(allJobs);
+  const { data: allJobs, isLoading, isError, error, refetch } = useTransportJobViews();
+  // The server already limits the list to the branches this user may see.
+  const jobs = useMemo(() => allJobs ?? [], [allJobs]);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -72,6 +76,7 @@ function TransportTracking() {
   const selected = jobs.find((j) => j.id === selectedId) ?? filtered[0];
 
   if (isLoading) return <LoadingState />;
+  if (isError) return <ApiErrorNotice error={error} onRetry={refetch} />;
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -127,10 +132,15 @@ function TransportTracking() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <Detail icon={<User className="h-4 w-4" />} label="Driver" value={selected.driverName} />
-              <Detail icon={<Truck className="h-4 w-4" />} label="Truck" value={selected.truckRegistration} />
+              <Detail icon={<User className="h-4 w-4" />} label="Driver" value={selected.driverName || 'Unassigned'} />
+              <Detail icon={<Truck className="h-4 w-4" />} label="Truck" value={selected.truckRegistration || '—'} />
               <Detail icon={<MapPin className="h-4 w-4" />} label="From" value={selected.origin} />
               <Detail icon={<MapPin className="h-4 w-4" />} label="To" value={selected.destination} />
+            </div>
+\n            <div className="grid grid-cols-2 gap-3 text-sm">
+              {ref13Rows(selected).map((row) => (
+                <Detail key={row.label} icon={<PackageSearch className="h-4 w-4" />} label={row.label} value={row.value || '—'} />
+              ))}
             </div>
           </Card>
         ) : (

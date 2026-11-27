@@ -6,6 +6,8 @@ export interface BaseEntity {
   id: ID;
   createdAt: ISODate;
   updatedAt: ISODate;
+  /** Set on records read from the API; sent back as If-Match on update. */
+  rowVersion?: number;
 }
 
 export interface TimelineEvent {

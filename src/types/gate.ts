@@ -2,7 +2,7 @@ import { BaseEntity, ID, ISODate } from './common';
 import type { RefCounters } from '@/services/refCounterCore';
 
 export type GateDirection = 'IN' | 'OUT';
-export type GateStatus = 'Pending' | 'Approved' | 'Completed';
+export type GateStatus = 'Pending' | 'Approved' | 'Completed' | 'Cancelled';
 
 export type TimeSource = 'server' | 'device';
 export type CaptureMethod = 'QR' | 'Manual';

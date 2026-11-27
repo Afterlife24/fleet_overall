@@ -3,6 +3,7 @@ import type { Quotation, QuotationPhase, PhaseHistoryEntry } from '@/types/quota
 /** Valid phase changes. Lost -> Awaiting is only reachable through Reopen. */
 export const ALLOWED: ReadonlyArray<readonly [QuotationPhase, QuotationPhase]> = [
   ['Awaiting', 'Tender'],
+  ['Awaiting', 'Won'],
   ['Awaiting', 'Lost'],
   ['Tender', 'Won'],
   ['Tender', 'Lost'],

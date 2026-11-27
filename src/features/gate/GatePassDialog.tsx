@@ -1,64 +1,45 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCreateGateEntry, useMachines } from '@/hooks/useQueries';
-import { toastSuccess, toastError } from '@/lib/toast-helper';
-import { useAppStore } from '@/store/appStore';
-import { JA_ORG_ID, useAuthStore } from '@/store/authStore';
-import { fleetNumberOf, type MachineLite, type QrError } from '@/services/collectionCore';
-import { markCollectedForMachine } from '@/services/collectionDocs';
+import { ApiErrorNotice, describeApiError } from '@/components/common/ApiStatus';
 import {
-  CAMERA_MESSAGES,
-  GATE_SCAN_MESSAGES,
-  buildGateRecordFields,
-  directionFor,
-  resolveGateScan,
-  type CameraErrorCode,
-} from '@/services/gateCore';
-import { serverNow, type ServerTime } from '@/services/serverClock';
-import { appMachineResolver, toMachineLite } from '@/features/fleet/collectionWiring';
+  attachEvidencePhoto, useCan, useCreateGatePass, useMachineBookings, useResolveQr, useSubmission,
+} from '@/hooks/api/useGateApi';
+import { useFleetMachines } from '@/hooks/useApiResources';
+import { toastError, toastSuccess, toastWarning } from '@/lib/toast-helper';
+import type { BookingDto } from '@/services/api/bookings';
+import type { GateDirection, GatePassCreateDto, GatePassDto, GatePurpose, ResolveQrDto } from '@/services/api/gate';
+import { PURPOSE_LABEL } from '@/services/api/gateMappers';
+import { CAMERA_MESSAGES, type CameraErrorCode } from '@/services/gateCore';
 import { QrScanner } from './QrScanner';
 
-// REF-06 Â§5.1 Gate Capture â€” ONE page, under 60 seconds, works offline
-// Fields: QR scan OR fleet number, photo of truck/load, arriving-from, truck plate, submit
-const gatePassSchema = z.object({
-  // Scan QR or type fleet number (REF-06 Â§5.1)
-  machineId:     z.string().min(1, 'Fleet number is required'),
-  // Photo of truck/load (REF-06 Â§5.1)
-  truckPhoto:    z.instanceof(File).optional(),
-  // Arriving-from â€” site/yard picklist (REF-06 Â§5.1)
-  arrivingFrom:  z.enum(['Yard', 'Dubai', 'Abu Dhabi', 'Taweelah', 'Oilfields', 'Fujairah', 'KSA', 'External']),
-  // Truck plate (REF-06 Â§5.1)
-  truckPlate:    z.string().min(2, 'Truck plate is required'),
-});
-
-type GatePassFormData = z.infer<typeof gatePassSchema>;
+// REF-06 §5.1 Gate Capture. A scan is resolved by the server (strict); the pass is created Pending and has no
+// physical effect until it is completed. Manual entry is the authorized fallback and is recorded as Manual.
 
 type Mode = 'scan' | 'manual';
 
-interface ScanResult {
-  machine: MachineLite;
-  payload: string;
-  capturedAt: ServerTime;
-  warnNotOnHire: boolean;
-  gateDate: string;
-  gateTime: string;
-  gateTimeZone: string;
+const ARRIVING_FROM = ['Yard', 'Dubai', 'Abu Dhabi', 'Taweelah', 'Oilfields', 'Fujairah', 'KSA', 'External'] as const;
+const PURPOSES: GatePurpose[] = ['CUSTOMER_HIRE', 'CUSTOMER_RETURN', 'TRANSFER'];
+
+export const QR_INVALID_MESSAGE = 'This QR code is not valid. No gate pass was created and no movement was recorded.';
+
+/** Direction follows the purpose; only a transfer lets the operator choose. */
+export function directionForPurpose(purpose: GatePurpose, chosen: GateDirection | ''): GateDirection | '' {
+  if (purpose === 'CUSTOMER_HIRE') return 'OUT';
+  if (purpose === 'CUSTOMER_RETURN') return 'IN';
+  return chosen;
 }
 
-const TIME_ERROR = 'Could not get the time. Try again.';
-const STATUS_ERROR = 'Machine status is unavailable';
-
-const isValidIso = (iso: string | undefined): iso is string =>
-  typeof iso === 'string' && !Number.isNaN(Date.parse(iso));
-
-const deviceTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+/** Bookings a customer movement may reference: out on hire for a return, not yet dispatched for a hire. */
+export function eligibleBookings(purpose: GatePurpose | '', bookings: readonly BookingDto[]): BookingDto[] {
+  if (purpose === 'CUSTOMER_RETURN') return bookings.filter((b) => b.status === 'On Hire' && !!b.departedAt && !b.returnedAt);
+  if (purpose === 'CUSTOMER_HIRE') return bookings.filter((b) => !['Cancelled', 'Returned', 'Draft'].includes(b.status) && !b.departedAt);
+  return [];
+}
 
 interface GatePassDialogProps {
   open: boolean;
@@ -66,45 +47,79 @@ interface GatePassDialogProps {
   onOpenPass?: (id: string) => void;
 }
 
-export function GatePassDialog({ open, onClose }: GatePassDialogProps) {
-  const { data: machines } = useMachines();
-  const createMutation = useCreateGateEntry();
-  const { setMachineStatus, getMachineCurrentStatus } = useAppStore();
-  const orgId = useAuthStore((s) => s.user?.orgId ?? JA_ORG_ID);
+export function GatePassDialog({ open, onClose, onOpenPass }: GatePassDialogProps) {
+  const canWrite = useCan('gate.write');
+  const machinesQuery = useFleetMachines();
+  const resolveQr = useResolveQr();
+  const createPass = useCreateGatePass();
+  const submission = useSubmission();
+  const lastBody = useRef('');
 
   const [mode, setMode] = useState<Mode>('scan');
-  const [scan, setScan] = useState<ScanResult | null>(null);
-  const [scanError, setScanError] = useState<{ code: QrError; message: string } | null>(null);
+  const [scan, setScan] = useState<{ result: ResolveQrDto; payload: string; scannedAt: string } | null>(null);
+  const [scanError, setScanError] = useState<unknown>(null);
   const [cameraError, setCameraError] = useState<CameraErrorCode | null>(null);
-  const [inlineError, setInlineError] = useState<string | null>(null);
   const [scanKey, setScanKey] = useState(0);
-  // Bumped whenever a pending scan must be ignored (mode switch, scan again, reopen).
   const scanToken = useRef(0);
 
-  const form = useForm<GatePassFormData>({
-    resolver: zodResolver(gatePassSchema),
-    defaultValues: {
-      machineId: '',
-      arrivingFrom: 'Yard',
-    },
-  });
+  const [manualMachineId, setManualMachineId] = useState('');
+  const [purpose, setPurpose] = useState<GatePurpose | ''>('');
+  const [transferDirection, setTransferDirection] = useState<GateDirection | ''>('');
+  const [bookingId, setBookingId] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [truckPlate, setTruckPlate] = useState('');
+  const [arrivingFrom, setArrivingFrom] = useState<string>('Yard');
+  const [destination, setDestination] = useState('');
+  const [notes, setNotes] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [submitError, setSubmitError] = useState<unknown>(null);
+
+  const machineId = mode === 'scan' ? (scan?.result.kind === 'FLEET' ? scan.result.machine.id : '') : manualMachineId;
+  const bookingsQuery = useMachineBookings(purpose === 'TRANSFER' || !purpose ? null : machineId || null);
+  const bookings = useMemo(() => eligibleBookings(purpose, bookingsQuery.data ?? []), [purpose, bookingsQuery.data]);
+  const direction = purpose ? directionForPurpose(purpose, transferDirection) : '';
+  const customerMovement = purpose === 'CUSTOMER_HIRE' || purpose === 'CUSTOMER_RETURN';
+  const candidate = scan?.result.candidateBooking ?? null;
+  const candidateNote = scan?.result.candidateCollectionNote ?? null;
+
+  const resetForm = useCallback(() => {
+    setPurpose('');
+    setTransferDirection('');
+    setBookingId('');
+    setDriverName('');
+    setTruckPlate('');
+    setArrivingFrom('Yard');
+    setDestination('');
+    setNotes('');
+    setPhoto(null);
+    setSubmitError(null);
+  }, []);
 
   const clearScanState = useCallback(() => {
     scanToken.current += 1;
     setScan(null);
     setScanError(null);
     setCameraError(null);
-    setInlineError(null);
-    form.setValue('machineId', '');
-  }, [form]);
+    setManualMachineId('');
+    resolveQr.reset();
+    resetForm();
+    submission.renew();
+    lastBody.current = '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetForm]);
 
-  // Opening always starts in Scan_Mode with no scan data.
+  // Opening always starts in Scan mode with no scan data.
   useEffect(() => {
     if (!open) return;
     setMode('scan');
     clearScanState();
     setScanKey((k) => k + 1);
   }, [open, clearScanState]);
+
+  // A fleet scan with a single return candidate pre-selects the booking for a customer return.
+  useEffect(() => {
+    if (purpose === 'CUSTOMER_RETURN' && candidate && !bookingId) setBookingId(candidate.id);
+  }, [purpose, candidate, bookingId]);
 
   const switchMode = (next: Mode) => {
     if (next === mode) return;
@@ -118,331 +133,285 @@ export function GatePassDialog({ open, onClose }: GatePassDialogProps) {
     setScanKey((k) => k + 1);
   };
 
+  const changePurpose = (value: string) => {
+    const next = value as GatePurpose;
+    setPurpose(next);
+    setBookingId(next === 'CUSTOMER_RETURN' && candidate ? candidate.id : '');
+    if (next === 'TRANSFER') setTransferDirection('');
+    if (directionForPurpose(next, '') === 'IN' && !destination.trim()) setDestination('Yard');
+    setSubmitError(null);
+  };
+
   const handleDecode = async (text: string) => {
     const token = ++scanToken.current;
-    const result = resolveGateScan(text, orgId, appMachineResolver.list(orgId));
-    if (!result.ok) {
-      setScanError({ code: result.error, message: GATE_SCAN_MESSAGES[result.error] });
-      return;
-    }
-    const machine = result.machine;
-
-    let warnNotOnHire = false;
     try {
-      warnNotOnHire = directionFor(getMachineCurrentStatus(machine.id)) !== 'IN';
-    } catch {
-      // Status is read again at submit, which blocks the save if it still fails.
-    }
-
-    try {
-      const capturedAt = await serverNow();
+      const result = await resolveQr.mutateAsync(text);
       if (token !== scanToken.current) return;
-      if (!isValidIso(capturedAt?.iso)) throw new RangeError('Invalid time');
-      const gateTimeZone = deviceTimeZone();
-      const fields = buildGateRecordFields(capturedAt.iso, gateTimeZone, machine, 'QR', capturedAt.source, text);
-      form.setValue('machineId', machine.id);
-      setScan({
-        machine,
-        payload: text,
-        capturedAt,
-        warnNotOnHire,
-        gateDate: fields.gateDate,
-        gateTime: fields.gateTime,
-        gateTimeZone,
-      });
-    } catch {
+      setScan({ result, payload: text, scannedAt: new Date().toISOString() });
+      setScanError(null);
+    } catch (err) {
       if (token !== scanToken.current) return;
-      setInlineError(TIME_ERROR);
-      setScanKey((k) => k + 1);
+      setScanError(err);
     }
   };
 
-  const onSubmit = async (data: GatePassFormData) => {
-    if (mode === 'scan' && !scan) return;
-    setInlineError(null);
+  const qrInvalid = scanError ? describeApiError(scanError).code === 'QR_INVALID' : false;
+  const scanResultIsPass = scan?.result.kind === 'GATE_PASS';
 
-    let currentStatus: string;
+  const bodyReady = useMemo(() => {
+    if (!machineId || !purpose || !direction) return false;
+    if (customerMovement && !bookingId) return false;
+    if (!driverName.trim() || !destination.trim()) return false;
+    if (mode === 'scan' && (!scan || scan.result.kind !== 'FLEET')) return false;
+    return true;
+  }, [machineId, purpose, direction, customerMovement, bookingId, driverName, destination, mode, scan]);
+
+  const onSubmit = async () => {
+    if (!bodyReady || !purpose || !direction) return;
+    setSubmitError(null);
+    const noteId = purpose === 'CUSTOMER_RETURN' && candidateNote && candidate && bookingId === candidate.id ? candidateNote.id : null;
+    const body: GatePassCreateDto = {
+      direction,
+      movementPurpose: purpose,
+      machineId,
+      bookingId: customerMovement ? bookingId : null,
+      collectionNoteId: noteId,
+      captureMethod: mode === 'scan' ? 'QR' : 'Manual',
+      ...(mode === 'scan' && scan ? { qrPayload: scan.payload, scannedAt: scan.scannedAt, deviceCapturedAt: scan.scannedAt } : {}),
+      driverName: driverName.trim(),
+      truckPlate: truckPlate.trim() || null,
+      destination: destination.trim(),
+      arrivingFrom: direction === 'IN' ? arrivingFrom : null,
+      notes: notes.trim() || null,
+    };
+    // One Idempotency-Key per submission: a retry of the same body reuses it, an edited body gets a new one.
+    const signature = JSON.stringify(body);
+    if (signature !== lastBody.current) submission.renew();
+    lastBody.current = signature;
+
+    let pass: GatePassDto;
     try {
-      currentStatus = getMachineCurrentStatus(data.machineId);
-    } catch {
-      setInlineError(STATUS_ERROR);
-      return;
-    }
-    // Determine direction based on current status (overview.md Â§4.2)
-    // If machine is On Hire â†’ coming back IN (off-hire)
-    // If machine is Available/PDI/Allocated â†’ going OUT (delivery)
-    const direction = directionFor(currentStatus);
-
-    const machine = machines?.find((m) => m.id === data.machineId);
-    const lite: MachineLite | undefined =
-      mode === 'scan' ? scan?.machine : machine ? toMachineLite(machine, orgId) : undefined;
-    const liteForFields = lite ?? { fleetNo: undefined, assetNumber: data.machineId };
-
-    let fields: ReturnType<typeof buildGateRecordFields>;
-    try {
-      let capture: ServerTime | undefined;
-      if (mode === 'scan') capture = scan?.capturedAt;
-      else capture = await serverNow();
-      if (!capture || !isValidIso(capture.iso)) throw new RangeError('Invalid time');
-      fields = buildGateRecordFields(
-        capture.iso,
-        deviceTimeZone(),
-        liteForFields,
-        mode === 'scan' ? 'QR' : 'Manual',
-        capture.source,
-        mode === 'scan' ? scan?.payload : undefined,
-      );
-    } catch {
-      setInlineError(TIME_ERROR);
-      return;
-    }
-
-    const id = `ge-${Date.now()}`;
-    const reference = `GP-${String(Date.now()).slice(-4)}`;
-    const assetNumber = lite?.assetNumber ?? machine?.assetNumber ?? data.machineId;
-    const make = lite?.make ?? machine?.make;
-    const model = lite?.model ?? machine?.model;
-    const machineModel = make || model ? `${make ?? ''} ${model ?? ''}`.trim() : '';
-    const branchId = machine?.branchId ?? 'branch-dxb';
-    const branchName = machine?.branchName ?? machine?.branchId ?? 'Dubai';
-
-    try {
-      const gateData = {
-        orgId,
-        machineId: data.machineId,
-        truckPlate: data.truckPlate,
-        arrivingFrom: data.arrivingFrom,
-        direction,
-        assetNumber,
-        machineModel,
-        branchId,
-        branchName,
-        gatePass: reference,
-        status: 'Pending' as const,
-      };
-
-      // The service is the single writer of the gate store, so nothing is stored when it fails.
-      await createMutation.mutateAsync({ ...gateData, id, reference, ...fields });
-      // STATE MACHINE TRANSITIONS (overview.md Â§4.2)
-      if (direction === 'IN') {
-        // Machine arriving IN â†’ status â†’ PHI (off-hire, needs inspection)
-        setMachineStatus(data.machineId, 'PHI', 'Gate IN â€” off-hire, awaiting PHI inspection');
-        toastSuccess('Gate entry IN â€” machine â†’ PHI inspection');
-      } else {
-        // Machine going OUT â†’ status â†’ On Hire (delivery to customer)
-        setMachineStatus(data.machineId, 'On Hire', 'Gate OUT â€” delivered to customer');
-        toastSuccess('Gate entry OUT â€” machine â†’ On Hire');
-      }
+      pass = await createPass.mutateAsync({ body, submissionId: submission.id() });
     } catch (err) {
-      console.error('Gate entry error:', err);
-      toastError('Failed to log gate entry');
+      setSubmitError(err);
       return;
     }
+    submission.renew();
+    lastBody.current = '';
+    toastSuccess(`Gate pass ${pass.reference} created (Pending). The machine has not moved yet.`);
 
-    if (direction === 'IN') {
+    if (photo) {
       try {
-        const note = markCollectedForMachine(orgId, data.machineId, {
-          id,
-          reference,
-          timestamp: fields.timestamp,
-        });
-        if (note) toastSuccess(`Collection Note ${note.number} marked Collected`);
+        await attachEvidencePhoto(photo, { gatePassId: pass.id }, 'TRUCK');
       } catch (err) {
-        console.error('Collection note update error:', err);
-        toastError('Collection note was not updated');
+        toastWarning(`Gate pass saved, but the photo was not attached: ${err instanceof Error ? err.message : 'upload failed'}`);
       }
     }
-
-    form.reset();
+    onOpenPass?.(pass.id);
     onClose();
   };
 
-  const scannerActive = open && mode === 'scan' && !scan && !scanError && !cameraError;
+  const scannerActive = open && mode === 'scan' && !scan && !scanError && !cameraError && !resolveQr.isPending;
+  const machines = machinesQuery.data ?? [];
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Gate Entry (REF-06)</DialogTitle>
           <DialogDescription>
-            Scan QR or enter fleet number Â· Photo of truck Â· Arriving-from Â· Truck plate Â· Submit
+            Scan the fleet QR, choose what the movement is, pick the booking, then create the pass. The pass is Pending until it is approved and completed at the gate.
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form
-            onSubmit={(e) => {
-              if (mode === 'scan' && !scan) {
-                e.preventDefault();
-                return;
-              }
-              void form.handleSubmit(onSubmit)(e);
-            }}
-            className="space-y-4"
-          >
-            {/* Mode switch â€” always enabled */}
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === 'scan' ? 'default' : 'outline'}
-                aria-pressed={mode === 'scan'}
-                onClick={() => switchMode('scan')}
-              >
-                Scan QR
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === 'manual' ? 'default' : 'outline'}
-                aria-pressed={mode === 'manual'}
-                onClick={() => switchMode('manual')}
-              >
-                Enter fleet number manually
-              </Button>
-            </div>
+        {!canWrite && (
+          <div role="alert" className="rounded-md border border-destructive/40 p-2 text-sm text-destructive">
+            Your role cannot create gate passes.
+          </div>
+        )}
 
-            {mode === 'scan' ? (
-              <div className="space-y-2">
-                <FormField control={form.control} name="machineId" render={() => (
-                  <FormItem>
-                    <FormLabel>Fleet Number*</FormLabel>
-                    {scannerActive && (
-                      <QrScanner
-                        key={scanKey}
-                        active={scannerActive}
-                        onDecode={(t) => { void handleDecode(t); }}
-                        onError={(code) => setCameraError(code)}
-                      />
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant={mode === 'scan' ? 'default' : 'outline'} aria-pressed={mode === 'scan'} onClick={() => switchMode('scan')}>
+              Scan QR
+            </Button>
+            <Button type="button" size="sm" variant={mode === 'manual' ? 'default' : 'outline'} aria-pressed={mode === 'manual'} onClick={() => switchMode('manual')} disabled={!canWrite}>
+              Enter fleet number manually
+            </Button>
+          </div>
+
+          {mode === 'scan' ? (
+            <div className="space-y-2">
+              <Label>Fleet QR*</Label>
+              {scannerActive && (
+                <QrScanner key={scanKey} active={scannerActive} onDecode={(t) => { void handleDecode(t); }} onError={(code) => setCameraError(code)} />
+              )}
+              {resolveQr.isPending && <p className="text-sm text-muted-foreground" role="status">Checking the QR code...</p>}
+              {cameraError && (
+                <div role="alert" className="rounded-md border border-destructive/40 p-2 text-sm text-destructive">
+                  {CAMERA_MESSAGES[cameraError]}
+                </div>
+              )}
+              {scanError != null && qrInvalid && (
+                <div role="alert" data-testid="qr-invalid" className="space-y-2 rounded-md border border-destructive/40 p-2 text-sm text-destructive">
+                  <p className="font-medium">{QR_INVALID_MESSAGE}</p>
+                  <p className="text-xs">{describeApiError(scanError).message}</p>
+                  <p className="text-xs">Code: QR_INVALID</p>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={scanAgain}>Scan again</Button>
+                    {canWrite && <Button type="button" size="sm" variant="outline" onClick={() => switchMode('manual')}>Use manual entry</Button>}
+                  </div>
+                </div>
+              )}
+              {scanError != null && !qrInvalid && (
+                <div className="space-y-2">
+                  <ApiErrorNotice error={scanError} />
+                  <Button type="button" size="sm" variant="outline" onClick={scanAgain}>Scan again</Button>
+                </div>
+              )}
+              {scan && scanResultIsPass && (
+                <div className="space-y-2 rounded-md border p-2 text-sm" data-testid="scan-result">
+                  <p>This is the QR of gate pass <strong>{scan.result.pass?.reference}</strong> ({scan.result.pass?.status}). No new pass is created.</p>
+                  <div className="flex gap-2">
+                    {scan.result.pass && onOpenPass && (
+                      <Button type="button" size="sm" onClick={() => { onOpenPass(scan.result.pass!.id); onClose(); }}>Open pass</Button>
                     )}
-                    {cameraError && (
-                      <div role="alert" className="rounded-md border border-destructive/40 p-2 text-sm text-destructive">
-                        {CAMERA_MESSAGES[cameraError]}
-                      </div>
-                    )}
-                    {scanError && (
-                      <div role="alert" className="space-y-2 rounded-md border border-destructive/40 p-2 text-sm text-destructive">
-                        <p>{scanError.message}</p>
-                        <p className="text-xs">Code: {scanError.code}</p>
-                        <Button type="button" size="sm" variant="outline" onClick={scanAgain}>Scan again</Button>
-                      </div>
-                    )}
-                    {scan && (
-                      <div className="space-y-2 rounded-md border p-2 text-sm" data-testid="scan-result">
-                        <p><span className="text-muted-foreground">Fleet No: </span><strong>{fleetNumberOf(scan.machine)}</strong></p>
-                        <p>
-                          <span className="text-muted-foreground">Make / Model: </span>
-                          {scan.machine.make ?? '-'} {scan.machine.model ?? ''}
-                        </p>
-                        <p>
-                          <span className="text-muted-foreground">Gate-In date &amp; time: </span>
-                          {scan.gateDate} {scan.gateTime} ({scan.gateTimeZone}){' '}
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                            {scan.capturedAt.source === 'server' ? 'Server time' : 'Device time'}
-                          </span>
-                        </p>
-                        {scan.warnNotOnHire && (
-                          <p role="status" className="rounded-md border border-amber-400 bg-amber-50 p-2 text-amber-800">
-                            This machine is not On Hire. It will be logged as a Gate-Out.
-                          </p>
-                        )}
-                        <Button type="button" size="sm" variant="outline" onClick={scanAgain}>Scan again</Button>
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                    <Button type="button" size="sm" variant="outline" onClick={scanAgain}>Scan again</Button>
+                  </div>
+                </div>
+              )}
+              {scan && !scanResultIsPass && (
+                <div className="space-y-2 rounded-md border p-2 text-sm" data-testid="scan-result">
+                  <p><span className="text-muted-foreground">Fleet No: </span><strong>{scan.result.machine.fleetNo}</strong></p>
+                  <p><span className="text-muted-foreground">Asset No: </span>{scan.result.machine.assetNo}</p>
+                  <p><span className="text-muted-foreground">Status: </span>{scan.result.machine.operationalStatus} · {scan.result.machine.readinessStatus}</p>
+                  <p><span className="text-muted-foreground">Location: </span>{scan.result.machine.currentLocation || '—'}</p>
+                  {scan.result.openPasses.length > 0 && (
+                    <p role="status" className="rounded-md border border-amber-400 bg-amber-50 p-2 text-amber-800">
+                      This machine already has an open pass: {scan.result.openPasses.map((p) => `${p.reference} (${p.status})`).join(', ')}.
+                    </p>
+                  )}
+                  {scan.result.manualSelectionRequired ? (
+                    <p role="status" className="rounded-md border border-amber-400 bg-amber-50 p-2 text-amber-800">
+                      No single return booking was found for this machine. Choose the booking yourself below.
+                    </p>
+                  ) : candidate ? (
+                    <p className="text-xs text-muted-foreground">Return candidate: {candidate.reference}{candidateNote ? ` · collection note ${candidateNote.number}` : ''}</p>
+                  ) : null}
+                  <Button type="button" size="sm" variant="outline" onClick={scanAgain}>Scan again</Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Fleet Number*</Label>
+              <Select value={manualMachineId} onValueChange={(v) => { setManualMachineId(v); setBookingId(''); }}>
+                <SelectTrigger aria-label="Fleet number"><SelectValue placeholder="Select fleet number" /></SelectTrigger>
+                <SelectContent>
+                  {machines.length > 0 ? machines.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.fleetNo ?? m.assetNumber} — {m.make} {m.model}</SelectItem>
+                  )) : (
+                    <SelectItem value="__none__" disabled>{machinesQuery.isLoading ? 'Loading machines...' : 'No machines available'}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Manual entry is recorded as a Manual capture, not a QR scan.</p>
+            </div>
+          )}
+
+          {machineId && !scanResultIsPass && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Movement purpose*</Label>
+                <Select value={purpose} onValueChange={changePurpose}>
+                  <SelectTrigger aria-label="Movement purpose"><SelectValue placeholder="Choose the purpose" /></SelectTrigger>
+                  <SelectContent>
+                    {PURPOSES.map((p) => <SelectItem key={p} value={p}>{PURPOSE_LABEL[p]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              /* Type Fleet Number (REF-06 Â§5.1) */
-              <FormField control={form.control} name="machineId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fleet Number*</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Select fleet number" /></SelectTrigger>
-                    </FormControl>
+
+              {purpose === 'TRANSFER' && (
+                <div className="space-y-1">
+                  <Label>Direction*</Label>
+                  <Select value={transferDirection} onValueChange={(v) => setTransferDirection(v as GateDirection)}>
+                    <SelectTrigger aria-label="Direction"><SelectValue placeholder="IN or OUT" /></SelectTrigger>
                     <SelectContent>
-                      {machines && machines.length > 0 ? (
-                        machines.map(m => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.assetNumber} â€” {m.make} {m.model}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="__none__" disabled>No machines available</SelectItem>
+                      <SelectItem value="IN">IN — machine arriving</SelectItem>
+                      <SelectItem value="OUT">OUT — machine departing</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {purpose && purpose !== 'TRANSFER' && (
+                <p className="text-xs text-muted-foreground">Direction: <strong>{direction}</strong></p>
+              )}
+
+              {customerMovement && (
+                <div className="space-y-1">
+                  <Label>Booking*</Label>
+                  <Select value={bookingId} onValueChange={setBookingId}>
+                    <SelectTrigger aria-label="Booking"><SelectValue placeholder={bookingsQuery.isLoading ? 'Loading bookings...' : 'Select the exact booking'} /></SelectTrigger>
+                    <SelectContent>
+                      {bookings.length > 0 ? bookings.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>{b.reference} — {b.customerName} ({b.startDate} to {b.endDate})</SelectItem>
+                      )) : (
+                        <SelectItem value="__none__" disabled>No matching booking for this machine</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            )}
+                  {bookingsQuery.isError && <ApiErrorNotice error={bookingsQuery.error} onRetry={() => void bookingsQuery.refetch()} />}
+                </div>
+              )}
 
-            {inlineError && (
-              <div role="alert" className="rounded-md border border-destructive/40 p-2 text-sm text-destructive">
-                {inlineError}
+              <div className="space-y-1">
+                <Label htmlFor="gate-driver">Driver*</Label>
+                <Input id="gate-driver" value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="Driver name" />
               </div>
-            )}
+              <div className="space-y-1">
+                <Label htmlFor="gate-plate">Truck Plate</Label>
+                <Input id="gate-plate" value={truckPlate} onChange={(e) => setTruckPlate(e.target.value)} placeholder="ABC-1234" />
+              </div>
+              {direction === 'IN' && (
+                <div className="space-y-1">
+                  <Label>Arriving From*</Label>
+                  <Select value={arrivingFrom} onValueChange={setArrivingFrom}>
+                    <SelectTrigger aria-label="Arriving from"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ARRIVING_FROM.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label htmlFor="gate-destination">{direction === 'OUT' ? 'Destination*' : 'Destination / yard*'}</Label>
+                <Input id="gate-destination" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder={direction === 'OUT' ? 'Customer site' : 'Yard'} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="gate-photo">Photo of Truck / Load</Label>
+                <Input id="gate-photo" type="file" accept="image/png,image/jpeg" capture="environment" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="gate-notes">Notes</Label>
+                <Textarea id="gate-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+              </div>
+            </div>
+          )}
 
-            {/* Photo of truck/load (REF-06 Â§5.1) */}
-            <FormField control={form.control} name="truckPhoto" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Photo of Truck / Load</FormLabel>
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => field.onChange(e.target.files?.[0])}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+          {submitError != null && <ApiErrorNotice error={submitError} />}
+        </div>
 
-            {/* Arriving-from â€” site/yard picklist (REF-06 Â§5.1) */}
-            <FormField control={form.control} name="arrivingFrom" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Arriving From*</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    <SelectItem value="Yard">Yard</SelectItem>
-                    <SelectItem value="Dubai">Dubai</SelectItem>
-                    <SelectItem value="Abu Dhabi">Abu Dhabi</SelectItem>
-                    <SelectItem value="Taweelah">Taweelah</SelectItem>
-                    <SelectItem value="Oilfields">Oilfields</SelectItem>
-                    <SelectItem value="Fujairah">Fujairah</SelectItem>
-                    <SelectItem value="KSA">KSA</SelectItem>
-                    <SelectItem value="External">External</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {/* Truck Plate (REF-06 Â§5.1) */}
-            <FormField control={form.control} name="truckPlate" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Truck Plate*</FormLabel>
-                <FormControl><Input placeholder="ABC-1234" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || (mode === 'scan' && !scan)}
-                className="w-full"
-              >
-                {createMutation.isPending ? 'Logging...' : 'Submit â€” Log Gate Entry'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            disabled={createPass.isPending || !bodyReady || !canWrite}
+            className="w-full"
+            onClick={() => { void onSubmit().catch((e) => toastError(e instanceof Error ? e.message : 'Failed to create the gate pass')); }}
+          >
+            {createPass.isPending ? 'Creating...' : 'Create Gate Pass'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

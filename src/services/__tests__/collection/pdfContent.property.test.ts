@@ -183,7 +183,8 @@ describe('pdf content builders', () => {
   });
 });
 
-describe('pdf rendering', () => {
+// Cold dynamic imports of jspdf/qrcode can exceed the 5 s default under a full parallel run.
+describe('pdf rendering', { timeout: 30_000 }, () => {
   it('renders a non-empty application/pdf Blob', async () => {
     const [cn] = fc.sample(cnArb, { numRuns: 1, seed: 7 });
     const blob = await renderPdf(collectionNoteContent({ ...cn, number: 'CN-2026-0001' }));

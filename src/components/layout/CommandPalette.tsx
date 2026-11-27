@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Search } from 'lucide-react';
 import { getFilteredNavGroups } from '@/app/navigation';
-import { useMachines, useBookings, useBreakdowns } from '@/hooks/useQueries';
+import { useMachines, useBreakdowns } from '@/hooks/useQueries';
+import { useBookings } from '@/hooks/api/usePlannerApi';
 import { useAuthStore } from '@/store/authStore';
 import { useOrgStore } from '@/store/orgStore';
 

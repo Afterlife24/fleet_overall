@@ -1,153 +1,192 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { GateEntry } from '@/types/gate';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 
-const state = vi.hoisted(() => ({ entries: [] as unknown[] }));
-
-vi.mock('@/hooks/useQueries', () => ({
-  useGateEntries: () => ({ data: state.entries, isLoading: false }),
-  useApproveGateEntry: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useCompleteGateEntry: () => ({ mutateAsync: vi.fn(), isPending: false }),
+const toasts = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+vi.mock('@/lib/toast-helper', () => ({
+  toastSuccess: toasts.success, toastError: toasts.error, toastInfo: vi.fn(), toastWarning: vi.fn(),
 }));
-vi.mock('@/hooks/useBranchFilter', () => ({ useBranchFilter: <T,>(x: T) => x }));
-vi.mock('@/lib/toast-helper', () => ({ toastSuccess: vi.fn(), toastError: vi.fn() }));
+
+const api = vi.hoisted(() => ({
+  gate: { list: vi.fn(), get: vi.fn(), create: vi.fn(), approve: vi.fn(), cancel: vi.fn(), complete: vi.fn(), resolveQr: vi.fn() },
+  inspections: { list: vi.fn(), get: vi.fn() },
+  bookings: { list: vi.fn(), get: vi.fn() },
+  evidence: { list: vi.fn(), create: vi.fn() },
+  machines: [] as unknown[],
+}));
+vi.mock('@/services/api/gate', () => ({ gateApi: api.gate, inspectionsApi: api.inspections }));
+vi.mock('@/services/api/bookings', () => ({ bookingsApi: api.bookings }));
+vi.mock('@/services/api/documents', () => ({
+  documentsApi: { generate: vi.fn() },
+  evidenceApi: api.evidence,
+}));
+vi.mock('@/services/api/files', () => ({ filesApi: { upload: vi.fn(), get: vi.fn() } }));
+// The machine list is read through the retained fleet hook; the pdf/qr helpers need canvas and are not under test here.
+vi.mock('@/hooks/useApiResources', async (orig) => ({
+  ...(await orig<typeof import('@/hooks/useApiResources')>()),
+  useFleetMachines: () => ({ data: api.machines, isLoading: false }),
+}));
+vi.mock('@/services/collectionPdf', () => ({ qrDataUrl: vi.fn().mockResolvedValue('data:image/png;base64,AAAA') }));
+vi.mock('@/services/gatePassDocs', () => ({
+  gatePassContext: () => ({ companyName: 'Test Org', links: {} }),
+  downloadGateQrPng: vi.fn(),
+  printGatePass: vi.fn(),
+}));
+vi.mock('@/services/gatePassPdf', () => ({ gatePassPdf: vi.fn() }));
 vi.mock('./GatePassDialog', () => ({ GatePassDialog: () => null }));
 
-import { GatePage } from './GatePage';
-import { useAuthStore, rolePageAccess } from '@/store/authStore';
-import type { UserRole } from '@/store/authStore';
+import { useSessionStore } from '@/services/api/session';
+import { ApiClientError } from '@/services/api/http';
+import type { GatePassDto } from '@/services/api/gate';
+import { page, renderScreen, setSessionReady, unavailableError } from '@/test-support/apiScreens';
+import { GatePage, REOPEN_REQUIRED_MESSAGE } from './GatePage';
 
-const PAYLOAD = 'AXLEOPS-FLEET:org-1:m-1:FL-001';
+const TS = '2026-01-10T08:00:00.000Z';
+const pass = (id: string, over: Partial<GatePassDto> = {}): GatePassDto => ({
+  id, reference: `GP-2026-000${id}`, branchId: 'b-1', machineId: 'm-1', bookingId: null, transportJobId: null,
+  collectionNoteId: null, direction: 'OUT', movementPurpose: 'CUSTOMER_HIRE', status: 'Pending', fleetNoSnapshot: `F-${id}`,
+  driverName: `Driver ${id}`, truckPlate: 'ABC-1', destination: 'Site A', arrivingFrom: null, captureMethod: 'Manual',
+  scannedAt: null, qrPayload: null, deviceCapturedAt: null, requestedAt: TS, approvedAt: null, approvedBy: null, notes: null,
+  movement: null, createdAt: TS, updatedAt: TS, rowVersion: 2, ...over,
+});
 
-function entry(over: Partial<GateEntry> = {}): GateEntry {
-  return {
-    id: 'g1',
-    createdAt: '2025-01-15T08:30:00.000Z',
-    updatedAt: '2025-01-15T08:30:00.000Z',
-    reference: 'GATE-001',
-    assetNumber: 'A-1',
-    machineModel: 'CAT 320',
-    direction: 'IN',
-    timestamp: '2025-01-15T08:30:00.000Z',
-    driver: 'Ali',
-    destination: 'Dubai Yard',
-    status: 'Pending',
-    branchId: 'branch-dxb',
-    branchName: 'Dubai',
-    gatePass: 'GP-1',
-    ...over,
-  } as GateEntry;
-}
+const completeResult = (p: GatePassDto) => ({ pass: { ...p, status: 'Completed' }, movement: null, inspection: null, booking: null, alreadyCompleted: false });
 
-function openDetail(e: GateEntry) {
-  state.entries = [e];
-  render(<GatePage />);
-  fireEvent.click(screen.getByText(e.reference));
-}
-
-function rowValue(label: string): string | null {
-  const dt = screen.queryByText(label, { selector: 'dt' });
-  return dt ? (dt.nextElementSibling?.textContent ?? null) : null;
+function setPermissions(permissions: string[]) {
+  useSessionStore.setState((s) => ({ session: s.session ? { ...s.session, permissions } : s.session }));
 }
 
 beforeEach(() => {
-  state.entries = [];
+  vi.clearAllMocks();
+  setSessionReady();
+  setPermissions(['gate.read', 'gate.write', 'gate.approve']);
+  api.machines = [];
+  api.bookings.get.mockResolvedValue(undefined);
+  api.evidence.list.mockResolvedValue({ items: [] });
+  api.gate.list.mockResolvedValue(page([
+    pass('1', { direction: 'OUT', status: 'Pending' }),
+    pass('2', { direction: 'IN', movementPurpose: 'CUSTOMER_RETURN', status: 'Approved', arrivingFrom: 'Dubai', destination: 'Yard' }),
+  ]));
 });
-afterEach(() => cleanup());
+afterEach(cleanup);
 
-describe('GatePage detail panel', () => {
-  it('shows all capture fields for a full record', () => {
-    openDetail(entry({
-      fleetNo: 'FL-001',
-      gateDate: '2025-01-15',
-      gateTime: '12:30:00',
-      gateTimeZone: 'Asia/Dubai',
-      captureMethod: 'Manual',
-      timeSource: 'server',
-    }));
-    expect(rowValue('Fleet No.')).toBe('FL-001');
-    expect(rowValue('Gate Date')).toBe('2025-01-15');
-    expect(rowValue('Gate Time')).toBe('12:30:00 Asia/Dubai');
-    expect(rowValue('Capture Method')).toBe('Manual');
-    expect(rowValue('Time Source')).toBe('server');
-    expect(rowValue('QR Payload')).toBeNull();
-    expect(rowValue('Timestamp')).toBeNull();
-    expect(rowValue('Truck Plate')).not.toBeNull();
-    expect(rowValue('Gate Pass')).toBe('GP-1');
-    expect(rowValue('Driver')).toBe('Ali');
-    expect(rowValue('Branch')).toBe('Dubai');
+describe('Gate page (API)', () => {
+  it('lists the passes read from the API on the Gate Exit and Gate Entry tabs', async () => {
+    renderScreen(<GatePage />);
+    // The default tab is Gate Entry (IN).
+    expect(await screen.findByText('GP-2026-0002')).toBeTruthy();
+    expect(screen.queryByText('GP-2026-0001')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Gate Exit' }));
+    expect(screen.getByText('GP-2026-0001')).toBeTruthy();
+    expect(screen.queryByText('GP-2026-0002')).toBeNull();
+    expect(api.gate.list).toHaveBeenCalled();
   });
 
-  it('derives date and time for a legacy record and shows "-" for missing fields', () => {
-    openDetail(entry());
-    expect(rowValue('Fleet No.')).toBe('A-1');
-    expect(rowValue('Gate Date')).toBe('2025-01-15');
-    expect(rowValue('Gate Time')).toBe('08:30:00 UTC');
-    expect(rowValue('Capture Method')).toBe('-');
-    expect(rowValue('Time Source')).toBe('-');
-    expect(rowValue('QR Payload')).toBeNull();
+  it('opens the detail panel with the pass details when a row is clicked', async () => {
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByText('GP-2026-0002'));
+    expect(await screen.findByText('Gate Entry Details (REF-06)')).toBeTruthy();
+    expect(screen.getByText('Driver 2', { selector: 'dd' })).toBeTruthy();
+    expect(screen.getByText('Customer return (in)', { selector: 'span.rounded-md.bg-muted' })).toBeTruthy();
+    expect(screen.getByTestId('gate-qr-fleet').textContent).toBe('F-2');
+    expect(screen.getByTestId('gate-qr-payload').textContent).toContain('GP-2026-0002');
   });
 
-  it('appends "Device time" when the time source is device', () => {
-    openDetail(entry({
-      gateDate: '2025-01-15',
-      gateTime: '12:30:00',
-      gateTimeZone: 'Asia/Dubai',
-      timeSource: 'device',
-    }));
-    expect(rowValue('Gate Time')).toBe('12:30:00 Asia/Dubai · Device time');
-    expect(rowValue('Time Source')).toBe('device');
+  it('shows Approve only to a user with gate.approve', async () => {
+    api.gate.list.mockResolvedValue(page([pass('1', { status: 'Pending' })]));
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gate Exit' }));
+    expect(await screen.findByRole('button', { name: 'Approve' })).toBeTruthy();
+    cleanup();
+
+    setPermissions(['gate.read', 'gate.write']);
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gate Exit' }));
+    await screen.findByText('GP-2026-0001');
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
   });
 
-  it('shows the full QR payload for a QR record', () => {
-    openDetail(entry({ captureMethod: 'QR', qrPayload: PAYLOAD }));
-    expect(rowValue('QR Payload')).toBe(PAYLOAD);
-    expect(rowValue('Capture Method')).toBe('QR');
+  it('approves with the row version of the pass', async () => {
+    api.gate.list.mockResolvedValue(page([pass('1', { status: 'Pending', rowVersion: 7 })]));
+    api.gate.approve.mockResolvedValue(pass('1', { status: 'Approved', rowVersion: 8 }));
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gate Exit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+    await waitFor(() => expect(api.gate.approve).toHaveBeenCalledWith('1', 7));
+    await waitFor(() => expect(toasts.success).toHaveBeenCalled());
   });
 
-  it('shows "Not available" for a QR record without payload', () => {
-    openDetail(entry({ captureMethod: 'QR' }));
-    expect(rowValue('QR Payload')).toBe('Not available');
+  it('completes an approved pass once and sends the same Idempotency-Key when the click is retried', async () => {
+    const approved = pass('2', { direction: 'IN', status: 'Approved' });
+    api.gate.list.mockResolvedValue(page([approved]));
+    api.gate.complete
+      .mockRejectedValueOnce(unavailableError())
+      .mockResolvedValueOnce(completeResult(approved));
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete' }));
+    expect(await screen.findByTestId('api-error')).toBeTruthy();
+    expect(toasts.success).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complete' }));
+    await waitFor(() => expect(toasts.success).toHaveBeenCalledTimes(1));
+    expect(api.gate.complete).toHaveBeenCalledTimes(2);
+    const [firstId, firstKey] = api.gate.complete.mock.calls[0];
+    const [secondId, secondKey] = api.gate.complete.mock.calls[1];
+    expect(firstId).toBe('2');
+    expect(secondId).toBe('2');
+    expect(typeof firstKey).toBe('string');
+    expect(secondKey).toBe(firstKey);
   });
 
-  it('shows "Not available" for date and time when dates are unparseable', () => {
-    openDetail(entry({ timestamp: 'garbage', createdAt: 'also-bad' }));
-    expect(rowValue('Gate Date')).toBe('Not available');
-    expect(rowValue('Gate Time')).toBe('Not available');
-  });
-});
-
-describe('/gate page access by role', () => {
-  const allRoles = Object.keys(rolePageAccess) as UserRole[];
-  const allowed: UserRole[] = [
-    'Security',
-    'Ops Executive',
-    'Operations Manager',
-    'Executive Manager',
-    'Managing Director',
-  ];
-
-  it('covers all 16 roles', () => {
-    expect(allRoles).toHaveLength(16);
+  it('does not offer Complete for a Pending pass or to a user without gate.write', async () => {
+    api.gate.list.mockResolvedValue(page([pass('1', { status: 'Pending' }), pass('2', { direction: 'OUT', status: 'Approved' })]));
+    setPermissions(['gate.read']);
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gate Exit' }));
+    await screen.findByText('GP-2026-0001');
+    expect(screen.queryByRole('button', { name: 'Complete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New Gate Pass' })).toBeNull();
   });
 
-  it.each(allRoles.map((r) => [r, allowed.includes(r)] as const))(
-    '%s -> %s',
-    (role, expected) => {
-      useAuthStore.setState({
-        user: {
-          id: 'u',
-          name: 'T',
-          email: 't@x.com',
-          role,
-          branchId: 'b',
-          branchName: 'B',
-          avatarColor: '#000',
-        },
-        isAuthenticated: true,
-      } as never);
-      expect(useAuthStore.getState().hasPageAccess('/gate')).toBe(expected);
-    },
-  );
+  it('requires a reason before a pass is cancelled', async () => {
+    api.gate.list.mockResolvedValue(page([pass('1', { status: 'Pending', rowVersion: 5 })]));
+    api.gate.cancel.mockResolvedValue(pass('1', { status: 'Cancelled' }));
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Gate Exit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
+    const confirm = await screen.findByRole('button', { name: 'Cancel pass' });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(api.gate.cancel).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Cancel reason'), { target: { value: '   ' } });
+    expect((screen.getByRole('button', { name: 'Cancel pass' }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText('Cancel reason'), { target: { value: 'Wrong machine' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel pass' }));
+    await waitFor(() => expect(api.gate.cancel).toHaveBeenCalledWith('1', 5, 'Wrong machine'));
+  });
+
+  it('shows the REOPEN_REQUIRED banner when completing hits a Lost quotation, and no success toast', async () => {
+    const approved = pass('2', { direction: 'IN', status: 'Approved' });
+    api.gate.list.mockResolvedValue(page([approved]));
+    api.gate.complete.mockRejectedValue(
+      new ApiClientError({ code: 'REOPEN_REQUIRED', message: 'Quotation is Lost', status: 409, correlationId: 'corr-reopen' }),
+    );
+    renderScreen(<GatePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete' }));
+    const banner = await screen.findByTestId('reopen-required');
+    expect(banner.textContent).toContain(REOPEN_REQUIRED_MESSAGE);
+    expect(banner.textContent).toContain('corr-reopen');
+    expect(toasts.success).not.toHaveBeenCalled();
+  });
+
+  it('shows the service-unavailable message and no passes when the API answers 503', async () => {
+    api.gate.list.mockRejectedValue(unavailableError());
+    renderScreen(<GatePage />);
+    const err = await screen.findByTestId('api-error');
+    expect(err.textContent).toContain('/api/v1');
+    expect(screen.queryByText(/GP-2026/)).toBeNull();
+    expect(screen.getByText('No entries found')).toBeTruthy();
+  });
 });

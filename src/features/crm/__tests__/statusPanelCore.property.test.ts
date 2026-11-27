@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { Quotation, QuotationPhase } from '@/types/quotation';
 import { PHASES } from '@/types/quotation';
-import { useCrmStore } from '@/store/crmStore';
 import { ALLOWED, applyTransition, isAllowed, transitionError } from '../crmRules';
 import { REASON_MAX, panelState, planPhaseRequest, statusOptions, validateReason } from '../statusPanelCore';
 
@@ -45,11 +44,11 @@ describe('Property 7: Status options follow the phase rules', () => {
     );
   });
 
-  it('allowed pairs are exactly the five valid moves', () => {
+  it('allowed pairs are exactly the six valid moves', () => {
     const pairs = PHASES.flatMap((from) =>
       statusOptions(from).filter((o) => o.allowed).map((o) => `${from}>${o.phase}`));
     expect(pairs.sort()).toEqual(
-      ['Awaiting>Tender', 'Awaiting>Lost', 'Tender>Won', 'Tender>Lost', 'Lost>Awaiting'].sort(),
+      ['Awaiting>Tender', 'Awaiting>Won', 'Awaiting>Lost', 'Tender>Won', 'Tender>Lost', 'Lost>Awaiting'].sort(),
     );
     expect(pairs).toHaveLength(ALLOWED.length);
   });
@@ -140,11 +139,11 @@ describe('Property 9: Accepted transition appends one history entry, by either p
           const pure = applyTransition(quotation(from), to, 'user', '2026-02-01T00:00:00.000Z', r);
           expect(pure.ok).toBe(true);
           if (!pure.ok) return;
+          // Panel save and drop share one path (the pure rule); the server applies the same rule.
           const results = [0, 1].map(() => {
-            useCrmStore.setState({ quotations: [quotation(from)] });
-            const res = useCrmStore.getState().changePhase('q-prop', to, 'user', r);
+            const res = applyTransition(quotation(from), to, 'user', '2026-02-01T00:00:00.000Z', r);
             expect(res.ok).toBe(true);
-            return useCrmStore.getState().quotations[0];
+            return (res as { ok: true; quotation: Quotation }).quotation;
           });
           const strip = (q: Quotation) => ({ ...q, updatedAt: '', lostAt: q.lostAt ? 'x' : undefined, history: q.history.map((h) => ({ ...h, id: '', timestamp: '' })) });
           expect(strip(results[0])).toEqual(strip(results[1]));

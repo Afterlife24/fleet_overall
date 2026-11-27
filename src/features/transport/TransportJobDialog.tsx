@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useForm, type FieldErrors, type Resolver } from 'react-hook-form';
 import * as z from 'zod';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,9 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { useCreateTransportJob, useMachines, useDrivers } from '@/hooks/useQueries';
-import { toastSuccess, toastError } from '@/lib/toast-helper';
-import { TransportValidationError } from '@/services/services';
+import { useFleetMachines, useSubmission } from '@/hooks/useApiResources';
+import { useCreateTransportJobApi } from '@/hooks/api/useTransportApi';
+import { ApiErrorNotice, describeApiError } from '@/components/common/ApiStatus';
+import { toastSuccess } from '@/lib/toast-helper';
+import { transportCreateFromForm } from '@/services/api/transportMappers';
 import {
   TRANSPORT_SALES, TRANSPORT_SHIFTS, TRANSPORT_TYPES, SR_NO_MIN, SR_NO_MAX,
 } from '@/services/transportCore';
@@ -82,8 +84,10 @@ const transportTeams = [
 ];
 
 export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
-  const { data: machines } = useMachines();
-  const createMutation = useCreateTransportJob();
+  const { data: machines } = useFleetMachines();
+  const createMutation = useCreateTransportJobApi();
+  const submission = useSubmission();
+  const [error, setError] = useState<unknown>(null);
 
   const form = useForm<TransportJobFormData>({
     resolver: transportResolver,
@@ -96,26 +100,32 @@ export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
   const onSubmit = async (data: TransportJobFormData) => {
     if (submitting.current) return;
     submitting.current = true;
+    setError(null);
     try {
-      await createMutation.mutateAsync(data);
+      // The Fleet field holds the machine id; the server stores the fleet number it has on file.
+      const body = transportCreateFromForm({ ...data, remarks: data.remarks ?? '' }, data.fleet);
+      await createMutation.mutateAsync({ body, submissionId: submission.id() });
+      submission.renew();
       toastSuccess('Transport job created successfully');
       form.reset(freshDefaults() as Partial<TransportJobFormData>);
       onClose();
     } catch (err) {
-      // Values stay in the form so the planner can correct and retry.
-      if (err instanceof TransportValidationError) {
-        for (const [name, message] of Object.entries(err.errors)) {
-          form.setError(name as keyof TransportJobFormData, { message });
-        }
-        toastError('Please fix the highlighted fields');
-      } else {
-        toastError(err instanceof Error && err.message ? `Failed to create transport job: ${err.message}` : 'Failed to create transport job');
+      // Values stay in the form so the planner can correct and retry (the same submission id is reused).
+      setError(err);
+      const fieldMap: Record<string, keyof TransportJobFormData> = {
+        plannerName: 'plannerName', scheduleDate: 'date', shift: 'shift', transportTeam: 'transportTeam',
+        scheduleSerial: 'srNo', machineId: 'fleet', origin: 'from', destination: 'to', transportText: 'transport',
+        typeCode: 'type', contactText: 'contact', salespersonCode: 'sales', clientText: 'client',
+        scheduledAt: 'time', remarks: 'remarks',
+      };
+      for (const [name, message] of Object.entries(describeApiError(err).fieldErrors)) {
+        const target = fieldMap[name];
+        if (target) form.setError(target, { message });
       }
     } finally {
       submitting.current = false;
     }
   };
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -207,8 +217,8 @@ export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
                       </FormControl>
                       <SelectContent>
                         {machines?.map(m => (
-                          <SelectItem key={m.id} value={m.assetNumber}>
-                            {m.assetNumber} — {m.make} {m.model}
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.fleetNo || m.assetNumber} — {m.make} {m.model}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -336,6 +346,7 @@ export function TransportJobDialog({ open, onClose }: TransportJobDialogProps) {
               )} />
             </Card>
 
+            {error != null && <ApiErrorNotice error={error} />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending || form.formState.isSubmitting}>

@@ -11,31 +11,31 @@ import { Timeline } from '@/components/common/Timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Machine, MachineCategory, MachineStatus } from '@/types/machine';
-import { useMachines } from '@/hooks/useQueries';
-import { useBranchFilter } from '@/hooks/useBranchFilter';
-import { LoadingState, ErrorState } from '@/components/common/EmptyState';
+import { useArchiveMachine, useFleetMachines, useSetMachineStatus } from '@/hooks/useApiResources';
+import { LoadingState } from '@/components/common/EmptyState';
+import { ApiErrorNotice, ApiSessionGate, errorText } from '@/components/common/ApiStatus';
 import { formatCurrency, formatDate, formatNumber, daysUntil } from '@/utils/format';
 import { getStatusColor } from '@/utils/statusColors';
 import { cn } from '@/lib/utils';
 import { AppOnboarding } from '@/features/apps/AppOnboarding';
 import { SchemaCustomizer } from '@/features/apps/SchemaCustomizer';
 import { SchemaFilterBar, applySchemaFilters } from '@/features/apps/SchemaFilterBar';
-import { SchemaForm } from '@/features/apps/SchemaForm';
 import { useAppOnboarding } from '@/hooks/useAppOnboarding';
 import { JA_ORG_ID, useAuthStore } from '@/store/authStore';
-import { useAppStore } from '@/store/appStore';
-import { machinesForOrg } from '@/services/mock/orgData';
 import { canInitiate } from '@/services/collectionCore';
 import { resolveFleetQueryForCurrentOrg } from '@/services/collectionDocs';
-import { toMachineLite, appMachineResolver, appCreateTransportJob } from '@/features/fleet/collectionWiring';
+import { toMachineLite, machineResolverFor } from '@/features/fleet/collectionWiring';
 import { MachineQrPanel } from '@/features/fleet/MachineQrPanel';
+import { MachineApiFormDialog } from '@/features/fleet/MachineApiFormDialog';
+import { MachineModelsDialog } from '@/features/fleet/MachineModelsDialog';
+import { MachineDocumentsSection } from '@/features/fleet/MachineDocumentsSection';
+import { OPERATIONAL_STATUSES } from '../../../shared/dto/index';
 import { InitiateDialog } from '@/features/collection/InitiateDialog';
 import { toastError, toastSuccess } from '@/lib/toast-helper';
 import { useOrgStore } from '@/store/orgStore';
-import { useCreateMachine, useUpdateMachine } from '@/hooks/useQueries';
 import { tableFields, filterableFields } from '@/types/schema';
 import {
-  Plus, Filter, Download, Forklift, FileText, Wrench, Calendar,
+  Plus, Filter, Download, Forklift, Wrench, Calendar,
   MapPin, Gauge, Battery, Building2, ShieldAlert, Sliders,
 } from 'lucide-react';
 
@@ -52,9 +52,19 @@ const DEEP_LINK_MESSAGES: Record<string, string> = {
 };
 
 
+/** Fleet screen. Reads and writes `/api/v1/machines`, `/machine-models` and machine documents; waits for the API session. */
 export function FleetPage() {
-  const { data: machines, isLoading, isError, refetch } = useMachines();
-  const filtered = useBranchFilter(machines);
+  return (
+    <ApiSessionGate>
+      <FleetScreen />
+    </ApiSessionGate>
+  );
+}
+
+function FleetScreen() {
+  const { data: machines, isLoading, isError, error, refetch } = useFleetMachines();
+  // The server already limits the list to the branches this user may see.
+  const filtered = useMemo(() => machines ?? [], [machines]);
   const onboarding = useAppOnboarding('fleet', machines?.length ?? 0);
   const authUser = useAuthStore((s) => s.user);
   const isOwner = !!authUser && (authUser.isOwner || authUser.role === 'Managing Director' || authUser.role === 'Executive Manager');
@@ -68,8 +78,8 @@ export function FleetPage() {
   const [selected, setSelected] = useState<Machine | null>(null);
   const [machineFormOpen, setMachineFormOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
-  const createMachine = useCreateMachine();
-  const updateMachine = useUpdateMachine();
+  const [modelsOpen, setModelsOpen] = useState(false);
+  const archiveMachine = useArchiveMachine();
   const [initiateOpen, setInitiateOpen] = useState(false);
   const [searchParams] = useSearchParams();
   const orgId = authUser?.orgId ?? JA_ORG_ID;
@@ -88,13 +98,13 @@ export function FleetPage() {
     lastHandledQuery.current = key;
     const res = resolveFleetQueryForCurrentOrg(
       { fleet: fleetParam, id: idParam, qr: qrParam },
-      appMachineResolver,
+      machineResolverFor(machines),
     );
     if (!res) return;
     if (res.ok) {
       const found =
         filtered.find((m) => m.id === res.machine.id) ??
-        machinesForOrg(orgId).find((m) => m.id === res.machine.id);
+        filtered.find((m) => (m.fleetNo ?? m.assetNumber) === res.machine.fleetNo);
       if (found) setSelected(found);
       else toastError(DEEP_LINK_MESSAGES.NOT_FOUND);
     } else {
@@ -102,9 +112,10 @@ export function FleetPage() {
     }
   }, [machines, filtered, fleetParam, idParam, qrParam, orgId]);
 
-  // System field keys for Fleet = the default schema's system keys. Values for
-  // these go to the record root; custom fields go into a `fields` bag.
-  const systemKeys = new Set(schema.filter((f) => f.system).map((f) => f.key));
+  // After a save or refresh, show the latest version of the open machine (it carries the row version).
+  useEffect(() => {
+    setSelected((cur) => (cur ? machines?.find((m) => m.id === cur.id) ?? cur : cur));
+  }, [machines]);
 
   // Count of machines needing TPC attention (expired or approaching expiry)
   const tpcAttentionCount = useMemo(
@@ -122,7 +133,7 @@ export function FleetPage() {
   }, [filtered, filterFields, filterValues, tpcOnly]);
 
   if (isError) {
-    return <ErrorState onRetry={() => refetch()} />;
+    return <ApiErrorNotice error={error} onRetry={() => void refetch()} />;
   }
 
   // Freshly-activated Fleet → show setup (presets, or load-previous on reactivation).
@@ -169,7 +180,7 @@ export function FleetPage() {
     <div className="space-y-5">
       <PageHeader
         title="Fleet Management"
-        description={`${data.length} machines across selected branch`}
+        description={`${data.length} machines`}
         actions={
           <>
             {isOwner && (
@@ -177,8 +188,9 @@ export function FleetPage() {
                 <Sliders className="mr-1.5 h-4 w-4" /> Customize
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={() => setModelsOpen(true)}>Models</Button>
             <Button variant="outline" size="sm"><Download className="mr-1.5 h-4 w-4" /> Export</Button>
-            <Button size="sm" onClick={() => setMachineFormOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> Add Machine</Button>
+            <Button size="sm" onClick={() => { setEditingMachine(null); setMachineFormOpen(true); }}><Plus className="mr-1.5 h-4 w-4" /> Add Machine</Button>
           </>
         }
       />
@@ -229,10 +241,25 @@ export function FleetPage() {
         width="xl"
         footer={
           <div className="flex flex-wrap gap-2">
+            {selected && (
+              <Button variant="outline" size="sm" onClick={() => { setEditingMachine(selected); setMachineFormOpen(true); }}>Edit</Button>
+            )}
+            {selected && selected.status !== 'Offline' && (
+              <Button
+                variant="outline" size="sm" disabled={archiveMachine.isPending}
+                title="Archived machines are kept, never deleted"
+                onClick={() => archiveMachine.mutate(
+                  { id: selected.id, rowVersion: selected.rowVersion ?? 0 },
+                  { onSuccess: () => { toastSuccess('Machine archived'); setSelected(null); }, onError: (err) => { toastError(errorText(err)); void refetch(); } },
+                )}
+              >
+                Archive
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="flex-1"><Wrench className="mr-1.5 h-4 w-4" /> Send to Workshop</Button>
             <Button size="sm" className="flex-1"><Calendar className="mr-1.5 h-4 w-4" /> New Booking</Button>
             {selected && canInitiate(
-              useAppStore.getState().getMachineCurrentStatus(selected.id) ?? selected.status,
+              selected.status,
               collectionActive,
             ) && (
               <Button variant="outline" size="sm" className="w-full" onClick={() => setInitiateOpen(true)}>
@@ -254,30 +281,17 @@ export function FleetPage() {
         <InitiateDialog
           open={initiateOpen}
           onOpenChange={setInitiateOpen}
-          machines={appMachineResolver}
-          createTransportJob={appCreateTransportJob}
           preselectMachineId={selected.id}
           onCreated={(r) => { if (r.cn) toastSuccess(`Created ${r.cn.number}`); }}
         />
       )}
 
-      <SchemaForm
-        title={editingMachine ? 'Edit Machine' : 'Add Machine'}
-        schema={schema}
-        record={editingMachine}
-        systemKeys={systemKeys}
+      <MachineApiFormDialog
         open={machineFormOpen}
+        machine={editingMachine}
         onClose={() => { setMachineFormOpen(false); setEditingMachine(null); }}
-        onSave={(values) => {
-          if (editingMachine) {
-            updateMachine.mutate({ id: editingMachine.id, data: values });
-          } else {
-            createMachine.mutate(values as any);
-          }
-          setMachineFormOpen(false);
-          setEditingMachine(null);
-        }}
       />
+      <MachineModelsDialog open={modelsOpen} onClose={() => setModelsOpen(false)} />
 
       <SchemaCustomizer appId="fleet" open={customizeOpen} onClose={() => setCustomizeOpen(false)} />
     </div>
@@ -396,22 +410,50 @@ function MachineDetail({ machine }: { machine: Machine }) {
         </div>
       )}
 
-      <SectionTitle>Documents</SectionTitle>
-      <div className="space-y-2">
-        {machine.documents.map((doc) => (
-          <div key={doc.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-            <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">{doc.name}</p>
-              <p className="text-xs text-muted-foreground">{doc.type} · {doc.size} · Expires {doc.expiryDate ? formatDate(doc.expiryDate) : 'N/A'}</p>
-            </div>
-            <Button variant="ghost" size="sm">View</Button>
-          </div>
-        ))}
-      </div>
+      <MachineStatusPanel machine={machine} />
+
+      <MachineDocumentsSection machineId={machine.id} />
 
       <SectionTitle>Activity Timeline</SectionTitle>
       <Timeline events={machine.timeline} compact />
+    </div>
+  );
+}
+
+/** Audited manual status override. The server requires a reason and accepts the reserved statuses only here. */
+function MachineStatusPanel({ machine }: { machine: Machine }) {
+  const setStatus = useSetMachineStatus();
+  const [status, setLocalStatus] = useState<string>(machine.status);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  return (
+    <div className="mt-4 space-y-2 rounded-md border border-border p-3" data-testid="machine-status-panel">
+      <p className="text-sm font-medium">Set status manually</p>
+      {error != null && <ApiErrorNotice error={error} />}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <select
+          aria-label="New status" className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          value={status} onChange={(e) => setLocalStatus(e.target.value)}
+        >
+          {OPERATIONAL_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+        </select>
+        <input
+          aria-label="Reason" placeholder="Reason" value={reason} onChange={(e) => setReason(e.target.value)}
+          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+        />
+        <Button
+          size="sm" disabled={setStatus.isPending || status === machine.status || !reason.trim()}
+          onClick={() => {
+            setError(null);
+            setStatus.mutate(
+              { id: machine.id, rowVersion: machine.rowVersion ?? 0, input: { operationalStatus: status as Machine['status'], reason: reason.trim() } },
+              { onSuccess: () => { toastSuccess('Status updated'); setReason(''); }, onError: setError },
+            );
+          }}
+        >
+          Apply
+        </Button>
+      </div>
     </div>
   );
 }

@@ -3,20 +3,22 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { useHireAgreementStore } from '@/store/hireAgreementStore';
 import { useBookingStore } from '@/store/bookingStore';
-import { useCrmStore, CRM_STORAGE_KEY } from '@/store/crmStore';
+import { useCrmStore } from '@/store/crmStore';
 import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
 import { resolveAllocation } from '@/services/hireLink';
 import { AUTO_WON_REASON } from '@/features/crm/crmRules';
-import { demoBookings } from '@/services/mock/demoHireLink';
 import type { HireAgreement } from '@/types/hireagreement';
 import type { Booking, BookingStatus } from '@/types/booking';
 import type { Quotation, QuotationPhase } from '@/types/quotation';
 
 // Feature: hire-agreement-planner-link, Property 2: Persistence round trip and legacy migration
 // **Validates: Requirements 3.1, 3.2, 3.3, 6.1, 6.2, 6.3, 14.1, 14.2, 15.2**
+// Quotations and hire agreements are API data now (backend-foundation-crm Requirement 15.5 and 15.8): their stores
+// are in-memory read copies and are not persisted. Bookings are API data as well (Planner stage): useBookingStore is an in-memory mirror and persists nothing.
 
 const BOOKING_KEY = 'fleet-bookings-v1';
 const AGREEMENT_KEY = 'fleet-hire-agreements-v1';
+const CRM_KEY = 'fleet-crm-v1';
 
 const orgArb = fc.constantFrom(JA_ORG_ID, 'org-a', 'org-b');
 const textArb = fc.string({ maxLength: 10 });
@@ -80,7 +82,7 @@ function clone<T>(v: T): T {
 
 /** Drops the in-memory state of the three stores, as a page reload would. */
 function wipeMemory() {
-  useHireAgreementStore.setState({ agreements: [], seededOrgs: [] });
+  useHireAgreementStore.setState({ agreements: [] });
   useBookingStore.setState({ userBookings: [] });
   useCrmStore.setState({ quotations: [] });
 }
@@ -91,11 +93,6 @@ function resetAll() {
   useAuthStore.setState({ user: null, isAuthenticated: false });
 }
 
-async function rehydrateAll() {
-  await useHireAgreementStore.persist.rehydrate();
-  await useBookingStore.persist.rehydrate();
-  await useCrmStore.persist.rehydrate();
-}
 
 function traceAll(bookings: Booking[]) {
   return bookings.map((b) => resolveAllocation(b.id));
@@ -104,12 +101,11 @@ function traceAll(bookings: Booking[]) {
 describe('persistence round trip and legacy migration', () => {
   beforeEach(resetAll);
 
-  it('keeps agreements, bookings, quotations (with auto-won history) and traces across rehydration', async () => {
+  it('keeps traces and applies auto-won history to the in-memory quotations', async () => {
     await fc.assert(
       fc.asyncProperty(worldArb, async (w) => {
         resetAll();
-        // seededOrgs prevents ensureSeeded (called by resolveAllocation) from adding rows.
-        useHireAgreementStore.setState({ agreements: clone(w.agreements), seededOrgs: [JA_ORG_ID] });
+        useHireAgreementStore.setState({ agreements: clone(w.agreements) });
         useBookingStore.setState({ userBookings: clone(w.bookings) });
         useCrmStore.setState({ quotations: clone(w.quotations) });
 
@@ -118,23 +114,25 @@ describe('persistence round trip and legacy migration', () => {
 
         const before = {
           agreements: clone(useHireAgreementStore.getState().agreements),
-          seeded: clone(useHireAgreementStore.getState().seededOrgs),
           bookings: clone(useBookingStore.getState().userBookings),
           quotations: clone(useCrmStore.getState().quotations),
           traces: clone(traceAll(w.bookings)),
         };
 
-        // Wiping memory writes empty state through persist, so restore the stored payloads first,
-        // as a fresh page load would find them.
-        const stored = [AGREEMENT_KEY, BOOKING_KEY, CRM_STORAGE_KEY].map((k) => [k, localStorage.getItem(k)!] as const);
+        // Nothing is stored in the browser: a page load starts empty and the mirrors are refilled from the API.
+        expect(localStorage.getItem(BOOKING_KEY)).toBeNull();
+        const agreements = before.agreements;
+        const quotations = before.quotations;
         wipeMemory();
-        for (const [k, v] of stored) localStorage.setItem(k, v);
-        await rehydrateAll();
+        expect(useBookingStore.getState().userBookings).toEqual([]);
+        useBookingStore.setState({ userBookings: clone(before.bookings) });
+        // Agreements and quotations are not persisted: they are read from the API again after a reload.
+        expect(useHireAgreementStore.getState().agreements).toEqual([]);
+        expect(useCrmStore.getState().quotations).toEqual([]);
+        useHireAgreementStore.setState({ agreements: clone(agreements) });
+        useCrmStore.setState({ quotations: clone(quotations) });
 
-        expect(useHireAgreementStore.getState().agreements).toEqual(before.agreements);
-        expect(useHireAgreementStore.getState().seededOrgs).toEqual(before.seeded);
         expect(useBookingStore.getState().userBookings).toEqual(before.bookings);
-        expect(useCrmStore.getState().quotations).toEqual(before.quotations);
         expect(clone(traceAll(w.bookings))).toEqual(before.traces);
 
         // Auto-won entries survive: Awaiting/Tender became Won with the auto reason; Lost/Won are untouched.
@@ -155,72 +153,12 @@ describe('persistence round trip and legacy migration', () => {
     );
   });
 
-  it('migrates legacy agreement rows (no orgId/quotationId) and legacy booking rows (no orgId/hireAgreementId)', async () => {
-    const legacyAgreementArb = fc.record(
-      {
-        orgId: orgArb,
-        quotationId: fc.constantFrom('', 'q0', 'q1'),
-        agreementNo: textArb,
-        customerName: textArb,
-      },
-      { requiredKeys: ['agreementNo', 'customerName'] },
-    );
-    const legacyBookingStatus = statusArb;
-
-    await fc.assert(
-      fc.asyncProperty(
-        fc.array(legacyAgreementArb, { minLength: 1, maxLength: 5 }),
-        fc.array(legacyBookingStatus, { minLength: 1, maxLength: 5 }),
-        async (rawAgreements, statuses) => {
-          resetAll();
-          const agreements = rawAgreements.map((a, i) => ({ id: `ha-legacy-${i}`, ...a }));
-          const bookings = statuses.map((status, i) => ({
-            id: `bk-legacy-${i}`, reference: `BK-${i}`, machineId: 'm1', customerName: 'c',
-            startDate: '2025-01-01', endDate: '2025-12-31', status,
-          }));
-          localStorage.setItem(AGREEMENT_KEY, JSON.stringify({ state: { agreements, seededOrgs: [JA_ORG_ID] }, version: 0 }));
-          localStorage.setItem(BOOKING_KEY, JSON.stringify({ state: { userBookings: bookings }, version: 0 }));
-
-          await useHireAgreementStore.persist.rehydrate();
-          await useBookingStore.persist.rehydrate();
-
-          const migrated = useHireAgreementStore.getState().agreements;
-          expect(migrated).toHaveLength(agreements.length);
-          agreements.forEach((raw, i) => {
-            expect(migrated[i]).toEqual({
-              ...raw,
-              orgId: (raw as { orgId?: string }).orgId ?? JA_ORG_ID,
-              quotationId: (raw as { quotationId?: string }).quotationId ?? '',
-            });
-          });
-
-          // Legacy rows stay as they were; the demo bookings are appended (v1 -> v2).
-          const all = useBookingStore.getState().userBookings;
-          const migratedBookings = all.filter((b) => b.id.startsWith('bk-legacy-'));
-          expect(migratedBookings).toEqual(bookings);
-          expect(all.map((b) => b.id)).toEqual([...bookings.map((b) => b.id), ...demoBookings.map((b) => b.id)]);
-          for (const b of migratedBookings) {
-            expect('hireAgreementId' in b).toBe(false);
-            expect('orgId' in b).toBe(false);
-            expect(resolveAllocation(b.id)).toEqual({ ok: false, reason: 'NO_AGREEMENT_ID' });
-          }
-        },
-      ),
-      { numRuns: 100 },
-    );
-  });
-
-  it('falls back to empty lists for a malformed persisted agreement state', async () => {
-    localStorage.setItem(AGREEMENT_KEY, JSON.stringify({ state: { agreements: 'nope' }, version: 0 }));
-    localStorage.setItem(BOOKING_KEY, JSON.stringify({ state: {}, version: 0 }));
-    await useHireAgreementStore.persist.rehydrate();
-    await useBookingStore.persist.rehydrate();
-    expect(useHireAgreementStore.getState().agreements).toEqual([]);
-    // A malformed booking state falls back to the demo bookings only.
-    expect(useBookingStore.getState().userBookings.map((b) => b.id)).toEqual(demoBookings.map((b) => b.id));
-  });
-
-  it('keeps persisted CRM data under its own storage key', () => {
-    expect(CRM_STORAGE_KEY).toBe('fleet-crm-v1');
+  it('does not write bookings, quotations or hire agreements to localStorage', () => {
+    useBookingStore.setState({ userBookings: [{ id: 'bk-1', orgId: JA_ORG_ID } as Booking] });
+    useCrmStore.setState({ quotations: [{ id: 'q-1', orgId: JA_ORG_ID } as Quotation] });
+    useHireAgreementStore.setState({ agreements: [{ id: 'a-1', orgId: JA_ORG_ID } as HireAgreement] });
+    expect(localStorage.getItem(BOOKING_KEY)).toBeNull();
+    expect(localStorage.getItem(CRM_KEY)).toBeNull();
+    expect(localStorage.getItem(AGREEMENT_KEY)).toBeNull();
   });
 });

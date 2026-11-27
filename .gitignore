@@ -11,7 +11,20 @@ node_modules
 dist
 dist-ssr
 *.local
-.env
+# Environment files: keep only the documented template
+.env*
+!.env.example
+
+# Server build output
+server/dist/
+
+# Local file storage root (uploaded files must never be committed)
+.local-storage/
+storage-local/
+
+# Generated Elastic Beanstalk package ZIPs
+*.zip
+build-artifacts/
 
 # Editor directories and files
 .vscode/*

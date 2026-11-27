@@ -107,7 +107,7 @@ function setup(w: World = {}) {
   useAuthStore.setState({ user: null, isAuthenticated: false });
   useOrgStore.setState({ installedApps: { [JA_ORG_ID]: w.apps ?? ['crm', 'quotation'] } });
   useBookingStore.setState({ userBookings: w.bookings ?? [makeBooking()] });
-  useHireAgreementStore.setState({ agreements: w.agreements ?? [makeAgreement()], seededOrgs: [JA_ORG_ID] });
+  useHireAgreementStore.setState({ agreements: w.agreements ?? [makeAgreement()] });
   useCrmStore.setState({ quotations: w.quotations ?? [makeQuotation()] });
 }
 

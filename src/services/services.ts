@@ -5,54 +5,44 @@
 // the signatures stay the same, so no page component needs to change.
 
 import {
-  branches, customers, machines, bookings, workshopJobs, technicians, workshopBays,
-  drivers, trucks, transportJobs, inspections, breakdowns, jobCards, users, notifications,
-  gateEntries, crossHires,
-  getBranchById, getCustomerById, getMachineById, getBookingById, getWorkshopJobById,
-  getTechnicianById, getDriverById, getTruckById, getTransportJobById, getInspectionById,
-  getBreakdownById, getJobCardById, getUserById, getInspectionsByType, getCrossHireById,
+  branches, workshopJobs, inspections, breakdowns, users,
+  crossHires,
 } from './mock';
 import { CrossHire } from '@/types/crosshire';
-import type { CustomerANI } from '@/types/customerani';
-import type { HireAgreement } from '@/types/hireagreement';
 import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
 import { useBookingStore } from '@/store/bookingStore';
-import { ensureHireLinkDemo, ensureGateDemo } from './demoSeed';
-import { useGateStore } from '@/store/gateStore';
-import { mergeGateList } from './gateCore';
-import type { GateRecord, GateStatus } from '@/types/gate';
-import { useTransportStore, TransportRefExhaustedError } from '@/store/transportStore';
 import {
-  validateTransportForm, mapFormToRecord, toTransportJobView, mergeTransportList,
-  type FieldErrors, type ViewCtx,
-} from './transportCore';
-import type { JobPatch, TransportJobStatus, TransportJobView } from '@/types/transport';
-import { findDuplicateFleetNo, fleetNumberOf, type MachineLite } from './collectionCore';
-import {
-  InvoiceRuleError, createFromQuotation, getInvoice, listInvoices, removeInvoice, updateInvoice,
-  type InvoiceEdits,
-} from './quotationInvoicing';
-import { useHireAgreementStore } from '@/store/hireAgreementStore';
-import {
-  assertQuotationMatchesCompany,
-  findAllocationsForAgreement,
-  HireAgreementInUseError,
-} from './hireLink';
-import {
-  machinesForOrg, crossHiresForOrg, bookingsForOrg, workshopJobsForOrg,
-  transportJobsForOrg, inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
-  gateEntriesForOrg, customersForOrg, branchesForOrg,
-  techniciansForOrg, workshopBaysForOrg, driversForOrg, trucksForOrg,
+  crossHiresForOrg, workshopJobsForOrg,
+  inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
+  branchesForOrg,
+  techniciansForOrg, workshopBaysForOrg,
   usersForOrg, notificationsForOrg,
 } from './mock/orgData';
-import type { Customer } from '@/types/customer';
-import type { CustomerRecord } from '@/types/customerani';
-import { useCustomerStore } from '@/store/customerStore';
-import { canonicalCustomerRecord, normalizeCustomerName } from './customerCore';
+import { listAll, loadCustomerRecords, loadCustomers, loadMachine, loadMachines } from './api/readAdapters';
+import { transportJobsApi } from './api/transport';
+import { kindOfType } from './transportCore';
+import type { TransportTypeCode } from '@/types/transport';
+import { useHireAgreementStore } from '@/store/hireAgreementStore';
 
 // Current tenant from the auth session (demo: read straight from the store).
 function currentOrgId(): string {
   return useAuthStore.getState().user?.orgId ?? JA_ORG_ID;
+}
+
+/** Bookings of the company, from the in-memory mirror that useRetainedMirrorSync fills from the API. */
+function mirroredBookings(orgId: string) {
+  return useBookingStore.getState().userBookings.filter((b) => (b.orgId ?? JA_ORG_ID) === orgId);
+}
+
+/** The transport job fields the dashboard and reports aggregate, read from /api/v1/transport-jobs. */
+async function loadTransportJobs() {
+  const dtos = await listAll((page, pageSize) => transportJobsApi.list({ page, pageSize }));
+  return dtos.map((d) => ({
+    type: kindOfType(d.typeCode as TransportTypeCode),
+    status: d.status,
+    branchId: d.branchId,
+    distance: d.distanceKm === null || d.distanceKm === '' || Number.isNaN(Number(d.distanceKm)) ? undefined : Number(d.distanceKm),
+  }));
 }
 
 // Simulate network latency
@@ -93,168 +83,16 @@ export const branchService = {
   },
 };
 
-/**
- * Registry rows of a company. The five Customer ANI demo customers are added once per company
- * (same data every company got before); marked ids are never re-added after a delete.
- */
-export function registryCustomers(orgId: string): CustomerRecord[] {
-  // TODO(7.4): call ensureRentalDemo(orgId) here once it exists (it seeds all nine canonical customers).
-  const store = useCustomerStore.getState();
-  store.seedOrg(orgId, [0, 1, 2, 3, 4].map((i) => canonicalCustomerRecord(orgId, i)));
-  return useCustomerStore.getState().forOrg(orgId);
-}
-
-function customerFromRegistry(c: CustomerRecord): Customer {
-  return {
-    id: c.id,
-    name: c.customerName,
-    contactPerson: c.attn ?? '',
-    phone: c.contactNumber,
-    email: c.email ?? '',
-    city: '',
-    country: 'UAE',
-    activeBookings: 0,
-    totalRevenue: 0,
-    rating: 0,
-    status: c.status === 'Active' ? 'Active' : 'Inactive',
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-  };
-}
-
-/** Registry customers plus the company's legacy `cu-*` rows whose normalized name is not in the registry. */
-function customersWithLegacy(orgId: string): Customer[] {
-  const reg = registryCustomers(orgId);
-  const names = new Set(reg.map((c) => normalizeCustomerName(c.customerName)));
-  const legacy = (customersForOrg(orgId) as Customer[]).filter((c) => !names.has(normalizeCustomerName(c.name)));
-  return [...reg.map(customerFromRegistry), ...legacy];
-}
-
+/** Customers of the company, read from `/api/v1/customers` and mapped to the shape retained screens use. */
 export const customerService = {
-  list: () => delay(customersWithLegacy(currentOrgId())),
-  get: (id: string) => delay(customersWithLegacy(currentOrgId()).find((c) => c.id === id)),
+  list: () => loadCustomers(),
+  get: async (id: string) => (await loadCustomers()).find((c) => c.id === id),
 };
 
-export class DuplicateFleetNoError extends Error {
-  readonly existingId: string;
-  constructor(fleetNo: string, existingId: string) {
-    super('Duplicate fleet number');
-    this.name = 'DuplicateFleetNoError';
-    this.existingId = existingId;
-    this.fleetNo = fleetNo;
-  }
-  fleetNo: string;
-}
-
-function assertNoDuplicateFleetNo(
-  list: unknown[],
-  candidate: { id?: string; orgId: string; fleetNo?: string; assetNumber: string },
-): void {
-  if (!fleetNumberOf(candidate)) return;
-  const lite: MachineLite[] = (list as any[]).map((m) => ({
-    id: m.id, orgId: currentOrgId(), fleetNo: m.fleetNo, assetNumber: m.assetNumber ?? '',
-  }));
-  const dup = findDuplicateFleetNo(lite, candidate);
-  if (dup) throw new DuplicateFleetNoError(fleetNumberOf(candidate), dup.id);
-}
-
+/** Machines of the company with their model and branch names, read from `/api/v1/machines`. */
 export const machineService = {
-  list: () => {
-    ensureHireLinkDemo(currentOrgId());
-    const list = machinesForOrg(currentOrgId());
-    return delay(list);
-  },
-  get: (id: string) => delay(machinesForOrg(currentOrgId()).find((m) => m.id === id)),
-  create: (data: Partial<typeof machines[0]>) => {
-    const orgId = currentOrgId();
-    const list = machinesForOrg(orgId);
-    const input = { ...data } as any;
-    // Keep fleetNo and assetNumber consistent when only one is supplied.
-    if (!(input.fleetNo ?? '').trim() && (input.assetNumber ?? '').trim()) input.fleetNo = input.assetNumber;
-    if (!(input.assetNumber ?? '').trim() && (input.fleetNo ?? '').trim()) input.assetNumber = input.fleetNo;
-    assertNoDuplicateFleetNo(list, { orgId, fleetNo: input.fleetNo, assetNumber: input.assetNumber ?? '' });
-    const newMachine = {
-      ...input,
-      id: `m-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    } as typeof machines[0];
-    list.push(newMachine);
-    return delay(newMachine);
-  },
-  update: (id: string, data: Partial<typeof machines[0]>) => {
-    const list = machinesForOrg(currentOrgId());
-    const index = list.findIndex((m) => m.id === id);
-    if (index === -1) throw new Error('Machine not found');
-    const merged = { ...list[index], ...data } as any;
-    assertNoDuplicateFleetNo(list, {
-      id, orgId: currentOrgId(), fleetNo: merged.fleetNo, assetNumber: merged.assetNumber ?? '',
-    });
-    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  updateStatus: (id: string, status: string) => {
-    const list = machinesForOrg(currentOrgId());
-    const index = list.findIndex((m) => m.id === id);
-    if (index === -1) throw new Error('Machine not found');
-    list[index] = { ...list[index], status: status as any, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  delete: (id: string) => {
-    const list = machinesForOrg(currentOrgId());
-    const index = list.findIndex((m) => m.id === id);
-    if (index === -1) throw new Error('Machine not found');
-    list.splice(index, 1);
-    return delay({ success: true });
-  },
-};
-
-// Bookings saved from the Planner form live in useBookingStore. Show them next to the demo list so the
-// calendar and booking views see them (records without an orgId belong to the demo org).
-function savedBookingsForOrg(orgId: string) {
-  return useBookingStore.getState().userBookings.filter((b) => (b.orgId ?? JA_ORG_ID) === orgId);
-}
-
-export const bookingService = {
-  list: () => {
-    ensureHireLinkDemo(currentOrgId());
-    return delay([...bookingsForOrg(currentOrgId()), ...savedBookingsForOrg(currentOrgId())]);
-  },
-  get: (id: string) => delay([...bookingsForOrg(currentOrgId()), ...savedBookingsForOrg(currentOrgId())].find((b) => b.id === id)),
-  forMachine: (machineId: string) => delay(bookingsForOrg(currentOrgId()).filter((b) => b.machineId === machineId)),
-  create: (data: Partial<typeof bookings[0]>) => {
-    const list = bookingsForOrg(currentOrgId());
-    const newBooking = {
-      ...data,
-      id: `bk-${Date.now()}`,
-      reference: `BK${Date.now().toString().slice(-6)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    } as typeof bookings[0];
-    list.push(newBooking);
-    return delay(newBooking);
-  },
-  update: (id: string, data: Partial<typeof bookings[0]>) => {
-    const list = bookingsForOrg(currentOrgId());
-    const index = list.findIndex((b) => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  updateStatus: (id: string, status: string) => {
-    const list = bookingsForOrg(currentOrgId());
-    const index = list.findIndex((b) => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    list[index] = { ...list[index], status: status as any, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  delete: (id: string) => {
-    const list = bookingsForOrg(currentOrgId());
-    const index = list.findIndex((b) => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    list.splice(index, 1);
-    return delay({ success: true });
-  },
+  list: () => loadMachines(),
+  get: (id: string) => loadMachine(id),
 };
 
 export const workshopService = {
@@ -297,81 +135,6 @@ export const workshopService = {
     list[index] = { ...list[index], technicianId, updatedAt: new Date().toISOString() };
     return delay(list[index]);
   },
-};
-
-export class TransportValidationError extends Error {
-  readonly errors: FieldErrors;
-  constructor(errors: FieldErrors) {
-    super('Transport job form is invalid');
-    this.name = 'TransportValidationError';
-    this.errors = errors;
-  }
-}
-
-export { TransportRefExhaustedError };
-
-function transportViewCtx(orgId: string): ViewCtx {
-  return { machines: machinesForOrg(orgId) };
-}
-
-let transportIdSeq = 0;
-
-export const transportService = {
-  /** Synchronous merge of persisted rows and the company's mock rows (newest first). */
-  listNow: (): TransportJobView[] => {
-    const org = currentOrgId();
-    // TODO(7.4): call ensureRentalDemo(org) here before reading, so demo jobs are seeded on first load.
-    const st = useTransportStore.getState();
-    return mergeTransportList(
-      st.forOrg(org),
-      transportJobsForOrg(org),
-      org,
-      st.overrides,
-      transportViewCtx(org),
-    );
-  },
-  listJobs: () => delay(transportService.listNow()),
-  getJob: (id: string) => delay(transportService.listNow().find((t) => t.id === id)),
-  listDrivers: () => {
-    // TODO(7.4): call ensureRentalDemo(currentOrgId()) here.
-    return delay(driversForOrg(currentOrgId()));
-  },
-  getDriver: (id: string) => delay(driversForOrg(currentOrgId()).find((d: any) => d.id === id)),
-  listTrucks: () => {
-    // TODO(7.4): call ensureRentalDemo(currentOrgId()) here.
-    return delay(trucksForOrg(currentOrgId()));
-  },
-  getTruck: (id: string) => delay(trucksForOrg(currentOrgId()).find((t: any) => t.id === id)),
-  /** Throws TransportValidationError or TransportRefExhaustedError. Stores nothing on failure. */
-  create: async (data: unknown): Promise<TransportJobView> => {
-    const checked = validateTransportForm(data);
-    if (!checked.ok) throw new TransportValidationError(checked.errors);
-    const org = currentOrgId();
-    const st = useTransportStore.getState();
-    const now = new Date();
-    const ref = st.issueRef(org, now.getFullYear());
-    const taken = new Set(st.jobs.map((j) => j.id));
-    let id: string;
-    do {
-      transportIdSeq += 1;
-      id = `tj-${now.getTime()}-${transportIdSeq}`;
-    } while (taken.has(id));
-    const ctx = transportViewCtx(org);
-    const rec = mapFormToRecord(checked.form, {
-      orgId: org, id, ref, now: now.toISOString(), machines: ctx.machines,
-    });
-    useTransportStore.getState().add(rec);
-    return toTransportJobView(rec, ctx);
-  },
-  update: async (id: string, patch: JobPatch): Promise<TransportJobView> => {
-    const org = currentOrgId();
-    if (!transportService.listNow().some((t) => t.id === id)) throw new Error('Transport job not found');
-    useTransportStore.getState().update(org, id, patch);
-    const out = transportService.listNow().find((t) => t.id === id);
-    if (!out) throw new Error('Transport job not found');
-    return out;
-  },
-  updateStatus: (id: string, status: TransportJobStatus) => transportService.update(id, { status }),
 };
 
 export const inspectionService = {
@@ -565,56 +328,6 @@ export const notificationService = {
   list: () => delay(notificationsForOrg(currentOrgId())),
 };
 
-export const gateService = {
-  list: () => {
-    const orgId = currentOrgId();
-    ensureGateDemo(orgId);
-    return delay(mergeGateList(useGateStore.getState().entries, gateEntriesForOrg(orgId), orgId));
-  },
-  create: (data: any) => {
-    const orgId = currentOrgId();
-    const store = useGateStore.getState();
-    const now = new Date().toISOString();
-    // Throws GateRefExhaustedError at 9999 for the year: nothing is stored then.
-    const reference: string = data?.reference ?? store.issueRef(orgId, new Date().getFullYear());
-    const taken = new Set(store.entries.map((r) => r.id));
-    let id: string = data?.id ?? `ge-${Date.now()}`;
-    if (!data?.id) {
-      for (let n = 1; taken.has(id); n += 1) id = `ge-${Date.now()}-${n}`;
-    }
-    const newEntry = {
-      timestamp: now,
-      ...data,
-      id,
-      reference,
-      gatePass: data?.gatePass ?? reference,
-      driver: data?.driver ?? '',
-      destination: data?.destination ?? data?.arrivingFrom ?? '',
-      status: 'Pending',
-      createdAt: now,
-      updatedAt: now,
-      orgId, // always the current company, never the payload's
-    } as GateRecord;
-    useGateStore.getState().add(newEntry);
-    return delay(newEntry);
-  },
-  approve: (id: string) => delay(changeGateStatus(id, 'Approved')),
-  complete: (id: string) => delay(changeGateStatus(id, 'Completed')),
-};
-
-// Updates a stored record, or copies a mock row into the store (copy-on-write) with the new status.
-function changeGateStatus(id: string, status: GateStatus): GateRecord {
-  const orgId = currentOrgId();
-  const store = useGateStore.getState();
-  const now = new Date().toISOString();
-  if (store.entries.some((r) => r.id === id && r.orgId === orgId)) {
-    return store.update(id, { status, updatedAt: now });
-  }
-  const mock = gateEntriesForOrg(orgId).find((g) => g.id === id);
-  if (!mock) throw new Error('Gate entry not found');
-  return store.upsert({ ...mock, orgId, status, updatedAt: now });
-}
-
 // Ã¢â€â‚¬Ã¢â€â‚¬ Cross Hire (sub-hire / re-hire) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Normalise a per-period rate to a monthly equivalent so Day/Week/Month deals
@@ -727,36 +440,18 @@ import { presetsForApp, type AppPreset } from '@/constants/appPresets';
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Customer ANI service Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-// Reads and writes the persisted Customer_Registry (customerStore). create and update throw
-// DuplicateCustomerError when the normalized name already exists in the company.
+// Customer records in the shape the retained invoice screen reads. The API is the authority; writes happen
+// through the Customers screen (`customersApi`).
 export const customerANIService = {
-  list: () => delay(registryCustomers(currentOrgId())),
-  get: (id: string) => delay(registryCustomers(currentOrgId()).find((c) => c.id === id)),
-  create: (data: Partial<CustomerANI>) => {
-    const orgId = currentOrgId();
-    registryCustomers(orgId);
-    return delay(useCustomerStore.getState().create(orgId, data));
-  },
-  update: (id: string, data: Partial<CustomerANI>) => {
-    const orgId = currentOrgId();
-    registryCustomers(orgId);
-    return delay(useCustomerStore.getState().update(orgId, id, data));
-  },
-  delete: (id: string) => {
-    const orgId = currentOrgId();
-    registryCustomers(orgId);
-    useCustomerStore.getState().remove(orgId, id);
-    return delay({ success: true });
-  },
+  list: () => loadCustomerRecords(currentOrgId()),
+  get: async (id: string) => (await loadCustomerRecords(currentOrgId())).find((c) => c.id === id),
 };
 
 // Which collections each app "owns" Ã¢â‚¬â€ used when clearing an app's data on a
 // "start fresh" reactivation. Backend: this maps to deleting the app's rows.
-const APP_COLLECTIONS: Record<string, Array<'machines' | 'crossHires' | 'branches' | 'customerANIs'>> = {
-  fleet: ['machines'],
+const APP_COLLECTIONS: Record<string, Array<'crossHires' | 'branches'>> = {
   cross_hire: ['crossHires'],
   branches: ['branches'],
-  customer_ani: ['customerANIs'],
 };
 
 export const onboardingService = {
@@ -766,20 +461,12 @@ export const onboardingService = {
     if (preset.blank || !preset.records) return delay({ success: true, created: 0 });
 
     let created = 0;
-    for (const m of preset.records.machines ?? []) {
-      await machineService.create(m as any);
-      created++;
-    }
     for (const c of preset.records.crossHires ?? []) {
       await crossHireService.create(c as any);
       created++;
     }
     for (const b of preset.records.branches ?? []) {
       await branchService.create(b as any);
-      created++;
-    }
-    for (const ca of (preset.records as any).customerANIs ?? []) {
-      await customerANIService.create(ca);
       created++;
     }
     return delay({ success: true, created });
@@ -791,10 +478,8 @@ export const onboardingService = {
     const cols = APP_COLLECTIONS[appId] ?? [];
     const org = currentOrgId();
     let n = 0;
-    if (cols.includes('machines')) n += machinesForOrg(org).length;
     if (cols.includes('crossHires')) n += crossHiresForOrg(org).length;
     if (cols.includes('branches')) n += branchesForOrg(org).length;
-    if (cols.includes('customerANIs')) n += registryCustomers(org).length;
     return n;
   },
 
@@ -802,13 +487,8 @@ export const onboardingService = {
   async clearAppData(appId: string) {
     const cols = APP_COLLECTIONS[appId] ?? [];
     const org = currentOrgId();
-    if (cols.includes('machines')) machinesForOrg(org).splice(0);
     if (cols.includes('crossHires')) crossHiresForOrg(org).splice(0);
     if (cols.includes('branches')) branchesForOrg(org).splice(0);
-    if (cols.includes('customerANIs')) {
-      registryCustomers(org); // mark the base seeds first so they are not re-added
-      useCustomerStore.getState().clearOrg(org);
-    }
     return delay({ success: true });
   },
 };
@@ -819,7 +499,7 @@ export const sixSigmaService = {
   async getMetrics(branchId?: string) {
     const ids = branchScopeIds(branchId);
     const org = currentOrgId();
-    const machines = machinesForOrg(org);
+    const machines = await loadMachines();
     const scopedMachines = machines.filter((m) => inScope(m.branchId, ids));
     const scopedBreakdowns = breakdownsForOrg(org).filter((b) => inScope((b as any).branchId, ids));
     const scopedWorkshopJobs = workshopJobsForOrg(org).filter((j) => inScope((j as any).branchId, ids));
@@ -852,9 +532,9 @@ export const dashboardService = {
   async getKPIs(branchId?: string) {
     const ids = branchScopeIds(branchId);
     const org = currentOrgId();
-    const machines = machinesForOrg(org);
+    const machines = await loadMachines();
     const scopedMachines = machines.filter((m) => inScope(m.branchId, ids));
-    const scopedTransport = transportService.listNow().filter((j) => inScope((j as any).branchId, ids));
+    const scopedTransport = (await loadTransportJobs()).filter((j) => inScope(j.branchId, ids));
     const scopedBreakdowns = breakdownsForOrg(org).filter((b) => inScope((b as any).branchId, ids));
     const scopedBays = workshopBaysForOrg(org).filter((b) => inScope((b as any).branchId, ids));
     const scopedWsJobs = workshopJobsForOrg(org).filter((j) => inScope((j as any).branchId, ids));
@@ -892,7 +572,7 @@ export const dashboardService = {
 
   async getFleetByCategory(branchId?: string) {
     const ids = branchScopeIds(branchId);
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     const counts = machines.filter((m) => inScope(m.branchId, ids)).reduce((acc, m) => {
       acc[m.category] = (acc[m.category] || 0) + 1;
       return acc;
@@ -902,7 +582,7 @@ export const dashboardService = {
 
   async getFleetByStatus(branchId?: string) {
     const ids = branchScopeIds(branchId);
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     const counts = machines.filter((m) => inScope(m.branchId, ids)).reduce((acc, m) => {
       acc[m.status] = (acc[m.status] || 0) + 1;
       return acc;
@@ -913,7 +593,7 @@ export const dashboardService = {
   async getBranchUtilization(branchId?: string) {
     const ids = branchScopeIds(branchId);
     const orgBranches = branchesForOrg(currentOrgId());
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     // Show only the branches within scope (all when unfiltered)
     const scopedBranches = ids ? orgBranches.filter((b) => ids.includes(b.id)) : orgBranches;
     return delay(scopedBranches.map((b) => {
@@ -937,9 +617,9 @@ export const dashboardService = {
 
   async getRecentActivity(branchId?: string) {
     const ids = branchScopeIds(branchId);
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     const allTimeline = machines.filter((m) => inScope(m.branchId, ids)).flatMap((m) =>
-      m.timeline.map((t) => ({ ...t, machineAsset: m.assetNumber, machineModel: `${m.make} ${m.model}` }))
+      (m.timeline ?? []).map((t) => ({ ...t, machineAsset: m.assetNumber, machineModel: `${m.make} ${m.model}` }))
     );
     const breakdownTimeline = breakdownsForOrg(currentOrgId()).filter((b) => inScope((b as any).branchId, ids)).flatMap((b) =>
       b.timeline.map((t) => ({ ...t, machineAsset: b.assetNumber, machineModel: b.machineModel }))
@@ -952,10 +632,10 @@ export const dashboardService = {
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Report aggregates Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
+async function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
   const org = currentOrgId();
-  const machines = machinesForOrg(org);
-  const bookings = bookingsForOrg(org);
+  const machines = await loadMachines();
+  const bookings = mirroredBookings(org);
   const breakdowns = breakdownsForOrg(org);
   const workshopJobs = workshopJobsForOrg(org);
   const multiplier = period === 'daily' ? 1 : period === 'weekly' ? 7 : 30;
@@ -976,9 +656,9 @@ function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
 }
 
 export const reportService = {
-  async getDailySummary() { return delay(computeSummary('daily')); },
-  async getWeeklySummary() { return delay(computeSummary('weekly')); },
-  async getMonthlySummary() { return delay(computeSummary('monthly')); },
+  async getDailySummary() { return delay(await computeSummary('daily')); },
+  async getWeeklySummary() { return delay(await computeSummary('weekly')); },
+  async getMonthlySummary() { return delay(await computeSummary('monthly')); },
 
   async getRevenueTrend(period: 'daily' | 'weekly' | 'monthly') {
     const labels = period === 'daily'
@@ -999,8 +679,8 @@ export const reportService = {
 
   async getBranchPerformance() {
     const org = currentOrgId();
-    const machines = machinesForOrg(org);
-    const bookings = bookingsForOrg(org);
+    const machines = await loadMachines();
+    const bookings = mirroredBookings(org);
     const breakdowns = breakdownsForOrg(org);
     return delay(branchesForOrg(org).map((b) => {
       const branchMachines = machines.filter((m) => m.branchId === b.id);
@@ -1034,7 +714,7 @@ export const reportService = {
   },
 
   async getTransportReport() {
-    const transportJobs = transportService.listNow();
+    const transportJobs = await loadTransportJobs();
     const statusCounts = transportJobs.reduce((acc, j) => {
       acc[j.status] = (acc[j.status] || 0) + 1;
       return acc;
@@ -1066,118 +746,9 @@ export const reportService = {
 
 // -- Hire Agreement service --------------------------------------------------
 
+// Agreements in the shape the retained invoice screen reads. The API is the authority: the in-memory copy read
+// here is filled from `hireAgreementsApi` by `useRetainedMirrorSync`; writes happen through the Hire Agreement screen.
 export const hireAgreementService = {
-  list: () => {
-    const orgId = currentOrgId();
-    ensureHireLinkDemo(orgId);
-    const store = useHireAgreementStore.getState();
-    store.ensureSeeded(orgId);
-    return delay(store.forOrg(orgId));
-  },
-  get: (id: string) => {
-    const orgId = currentOrgId();
-    const store = useHireAgreementStore.getState();
-    store.ensureSeeded(orgId);
-    return delay(store.forOrg(orgId).find((h) => h.id === id));
-  },
-  create: (data: Partial<HireAgreement>) => {
-    const orgId = currentOrgId();
-    const store = useHireAgreementStore.getState();
-    store.ensureSeeded(orgId);
-    const seq = store.forOrg(orgId).length + 1;
-    const year = new Date().getFullYear();
-    const now = new Date().toISOString();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, orgId: _orgId, createdAt: _c, updatedAt: _u, ...rest } = data;
-    const newRecord: HireAgreement = {
-      agreementNo: 'HA-' + year + '-' + String(seq).padStart(3, '0'),
-      date: now.slice(0, 10),
-      status: 'Draft',
-      lessorName: '', lessorTradeLicense: '', lessorTrn: '',
-      lessorAddress: '', lessorPhone: '', lessorEmail: '',
-      customerId: '', customerName: '', customerTrn: '',
-      attn: '', contactPerson: '', contactNumber: '',
-      customerEmail: '', billingAddress: '',
-      equipmentName: '', equipmentModel: '', serialNumber: '',
-      quantity: 1, capacity: '', workingHeight: '',
-      deliveryLocation: '', hireStartDate: '', hireEndDate: '', hireDuration: '',
-      monthlyRental: 0, transportationCharges: 0, subtotal: 0,
-      vat: 0, totalAmount: 0, paymentTerms: '30 Days',
-      securityDeposit: 0, paymentMethod: 'Bank Transfer',
-      ...rest,
-      id: store.newId(),
-      orgId,
-      quotationId: data.quotationId ?? '',
-      createdAt: now,
-      updatedAt: now,
-    } as HireAgreement;
-    assertQuotationMatchesCompany(orgId, newRecord);
-    store.insert(newRecord);
-    return delay(newRecord);
-  },
-  update: (id: string, data: Partial<HireAgreement>) => {
-    const orgId = currentOrgId();
-    const store = useHireAgreementStore.getState();
-    const existing = store.getById(id);
-    if (!existing || existing.orgId !== orgId) throw new Error('Hire agreement not found');
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, orgId: _orgId, createdAt: _c, ...rest } = data;
-    assertQuotationMatchesCompany(orgId, { ...existing, ...rest });
-    return delay(store.patch(id, { ...rest, updatedAt: new Date().toISOString() }));
-  },
-  delete: (id: string) => {
-    const orgId = currentOrgId();
-    const store = useHireAgreementStore.getState();
-    const existing = store.getById(id);
-    if (!existing || existing.orgId !== orgId) throw new Error('Hire agreement not found');
-    const refs = findAllocationsForAgreement(id);
-    if (refs.length > 0) throw new HireAgreementInUseError(refs);
-    store.remove(id);
-    return delay({ success: true });
-  },
-};
-// -- Tax Invoice service -----------------------------------------------------
-
-const INVOICE_EDIT_KEYS = [
-  'invoiceDate', 'currency', 'notes', 'equipmentDescription', 'equipmentQty', 'equipmentRate',
-  'transportationQty', 'transportationRate', 'paymentMethod', 'securityDeposit', 'billingAddress',
-  'dueDate', 'deliveryLocation', 'paymentTerms', 'customerTrn', 'attn', 'contactNumber', 'customerEmail',
-] as const;
-
-export const taxInvoiceService = {
-  list: () => delay(listInvoices()),
-  get: (id: string) => delay(getInvoice(id)),
-  create: (data: any) => {
-    try {
-      if (!data?.quotationId) throw new InvoiceRuleError('QUOTATION_REQUIRED');
-      const edits: Record<string, unknown> = {};
-      for (const k of INVOICE_EDIT_KEYS) if (data[k] !== undefined) edits[k] = data[k];
-      return delay(
-        createFromQuotation({
-          quotationId: data.quotationId,
-          invoiceType: data.invoiceType,
-          periodEnd: data.periodEnd,
-          periodStart: data.periodStart,
-          edits: edits as InvoiceEdits,
-        }),
-      );
-    } catch (e) {
-      return Promise.reject(e);
-    }
-  },
-  update: (id: string, data: any) => {
-    try {
-      return delay(updateInvoice(id, data));
-    } catch (e) {
-      return Promise.reject(e);
-    }
-  },
-  delete: (id: string) => {
-    try {
-      removeInvoice(id, 'delete');
-      return delay({ success: true });
-    } catch (e) {
-      return Promise.reject(e);
-    }
-  },
+  list: () => delay(useHireAgreementStore.getState().forOrg(currentOrgId())),
+  get: (id: string) => delay(useHireAgreementStore.getState().forOrg(currentOrgId()).find((h) => h.id === id)),
 };

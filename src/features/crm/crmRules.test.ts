@@ -135,10 +135,22 @@ describe('applyAutoWon', () => {
     );
   });
 
-  it('keeps the ALLOWED table and rejects manual Awaiting -> Won', () => {
-    expect(isAllowed('Awaiting', 'Won')).toBe(false);
+  it('keeps the ALLOWED table and allows manual Awaiting -> Won without a reason', () => {
+    expect(isAllowed('Awaiting', 'Won')).toBe(true);
+    const q = {
+      id: 'q1', createdAt: '2025-01-01T00:00:00.000Z', updatedAt: '2025-01-01T00:00:00.000Z', orgId: 'o', number: 'QT-1',
+      opportunity: 'x', hireAgreementNo: '', customerId: 'c', customerName: 'C', amount: 1, currency: 'AED',
+      phase: 'Awaiting', history: [],
+    } as Quotation;
+    const r = applyTransition(q, 'Won', 'user', '2025-01-02T00:00:00.000Z');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.quotation.phase).toBe('Won');
+      expect(r.quotation.history[0]).toMatchObject({ fromPhase: 'Awaiting', toPhase: 'Won' });
+    }
     expect(ALLOWED).toEqual([
       ['Awaiting', 'Tender'],
+      ['Awaiting', 'Won'],
       ['Awaiting', 'Lost'],
       ['Tender', 'Won'],
       ['Tender', 'Lost'],

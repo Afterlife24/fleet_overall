@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { Quotation, QuotationPhase } from '@/types/quotation';
 import { PHASES } from '@/types/quotation';
-import { CRM_STORAGE_KEY, migrateCrmState, useCrmStore } from '@/store/crmStore';
+import { useCrmStore } from '@/store/crmStore';
+
+// The CRM store is an in-memory read copy of the API data (backend-foundation-crm Requirement 15.5 and 15.8):
+// it is neither seeded nor persisted, so the old migration and persistence round trip properties no longer apply.
 
 const ORGS = ['org-ja', 'org-a', 'org-b'] as const;
 
@@ -13,11 +16,10 @@ const quotationArb: fc.Arbitrary<Quotation> = fc
     orgId: fc.constantFrom(...ORGS),
     phase: fc.constantFrom<QuotationPhase>(...PHASES),
     name: fc.constantFrom('ABC Company', 'Arabtec Contracting', 'DEF Company LLC', 'Some Customer'),
-    seed: fc.boolean(),
     reason: fc.string({ minLength: 1, maxLength: 20 }),
   })
-  .map(({ n, orgId, phase, name, seed, reason }) => ({
-    id: seed ? `qt-seed-${n}` : `qt-${n}`,
+  .map(({ n, orgId, phase, name, reason }) => ({
+    id: `qt-${n}`,
     orgId,
     number: `QT-2026-${String(n).padStart(4, '0')}`,
     opportunity: `Opp ${n}`,
@@ -40,62 +42,28 @@ const listArb = fc.array(quotationArb, { maxLength: 12 }).map((qs) => {
   return qs.filter((q) => (seen.has(q.id) ? false : (seen.add(q.id), true)));
 });
 
-beforeEach(() => { localStorage.clear(); });
+beforeEach(() => { localStorage.clear(); useCrmStore.setState({ quotations: [] }); });
 
-// Feature: rental-flow-integration, Property 18: Company isolation and persistence round trip
-describe('Property 18: Company isolation and persistence round trip (crm store)', () => {
+// Feature: rental-flow-integration, Property 18: Company isolation (crm store)
+describe('Property 18: Company isolation (crm store read copy)', () => {
   /** **Validates: Requirements 3.12, 3.14, 9.1, 9.2, 9.3** */
-  it('v3 to v4 migration keeps every record and only canonicalizes seed customer names', () => {
-    fc.assert(
-      fc.property(listArb, (qs) => {
-        const out = migrateCrmState({ quotations: JSON.parse(JSON.stringify(qs)) }, 3).quotations;
-        expect(out.map((q) => q.id)).toEqual(qs.map((q) => q.id));
-        out.forEach((q, i) => {
-          const before = qs[i];
-          const isSeed = before.id.startsWith('qt-seed-');
-          const fixable = before.customerName === 'ABC Company' || before.customerName === 'Arabtec Contracting';
-          if (isSeed && fixable) {
-            expect(q.customerName).toBe(before.customerName === 'ABC Company' ? 'ABC Company LLC' : 'Arabtec Construction LLC');
-            expect(q.customerId).toMatch(/^CUST-\d{6}$/);
-            expect({ ...q, customerName: '', customerId: '' }).toEqual({ ...before, customerName: '', customerId: '' });
-          } else {
-            expect(q).toEqual(before);
-          }
-        });
-      }),
-      { numRuns: 100 },
-    );
+  it('starts empty and never writes to localStorage', () => {
+    expect(useCrmStore.getState().quotations).toEqual([]);
+    useCrmStore.setState({ quotations: [{ id: 'q', orgId: 'org-a' } as Quotation] });
+    expect(Object.keys(localStorage)).toEqual([]);
   });
 
-  it('migration of any input does not throw and is idempotent', () => {
+  it('an automatic change for one company leaves the other companies equal', () => {
     fc.assert(
-      fc.property(fc.anything(), fc.integer({ min: 0, max: 4 }), (junk, version) => {
-        const once = migrateCrmState(junk, version);
-        expect(Array.isArray(once.quotations)).toBe(true);
-        expect(migrateCrmState(once, 4)).toEqual(once);
-      }),
-      { numRuns: 100 },
-    );
-  });
-
-  it('serialize and rehydrate keep phase history; a change for one company leaves the others equal', async () => {
-    await fc.assert(
-      fc.asyncProperty(listArb, fc.constantFrom(...ORGS), async (qs, org) => {
-        localStorage.clear();
-        const users = qs.map((q) => ({ ...q, customerName: 'Some Customer', customerId: 'CUS-1' }));
-        useCrmStore.setState({ quotations: users });
-        const target = users.find((q) => q.orgId === org && q.phase === 'Awaiting');
-        const others = users.filter((q) => q.orgId !== org);
+      fc.property(listArb, fc.constantFrom(...ORGS), (qs, org) => {
+        useCrmStore.setState({ quotations: qs });
+        const target = qs.find((q) => q.orgId === org && q.phase === 'Awaiting');
+        const others = qs.filter((q) => q.orgId !== org);
         if (target) {
-          expect(useCrmStore.getState().changePhase(target.id, 'Tender', 'u').ok).toBe(true);
+          expect(useCrmStore.getState().autoWon(org, target.id, 'System')).toMatchObject({ ok: true, result: { kind: 'changed' } });
         }
         const after = useCrmStore.getState().quotations;
         for (const o of others) expect(after.find((q) => q.id === o.id)).toEqual(o);
-        const stored = localStorage.getItem(CRM_STORAGE_KEY)!;
-        useCrmStore.setState({ quotations: [] });
-        localStorage.setItem(CRM_STORAGE_KEY, stored);
-        await useCrmStore.persist.rehydrate();
-        expect(useCrmStore.getState().quotations).toEqual(after);
       }),
       { numRuns: 100 },
     );

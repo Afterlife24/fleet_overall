@@ -101,10 +101,10 @@ describe('crmStore.autoWon', () => {
     }
   });
 
-  it('manual changePhase still rejects Awaiting -> Won', () => {
-    const before = find('q-await');
-    const res = useCrmStore.getState().changePhase('q-await', 'Won', 'user');
-    expect(res.ok).toBe(false);
-    expect(find('q-await')).toEqual(before);
+  it('is not seeded: a fresh store holds no quotations', () => {
+    useCrmStore.setState({ quotations: [] });
+    expect(useCrmStore.getState().quotations).toEqual([]);
   });
 });
+// Manual phase changes (including Awaiting -> Won without a reason) now go through quotationsApi.changePhase;
+// the rule itself is covered by crmRules.test.ts and the CRM component tests.

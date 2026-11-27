@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatDateTime } from '@/utils/format';
-import { type Quotation, type QuotationDraft, type QuotationPhase } from '@/types/quotation';
+import { type PhaseHistoryEntry, type Quotation, type QuotationPhase } from '@/types/quotation';
+import type { CustomerRecord } from '@/types/customerani';
+import { ApiErrorNotice } from '@/components/common/ApiStatus';
 import { useInvoicesForQuotation } from '@/services/quotationInvoicing';
-import { companiesOf, nextHireAgreementNo } from './crmRules';
 import { panelState, statusOptions, validateReason } from './statusPanelCore';
 
 const PHASE_STYLE: Record<QuotationPhase, string> = {
@@ -81,20 +82,38 @@ export function ReasonDialog({
   );
 }
 
+export type SaveResult = { ok: true } | { ok: false; error: unknown };
+
 export interface StatusEditorProps {
-  onSave: (to: QuotationPhase, reason?: string) => { ok: boolean; error?: string };
+  /** Saves a phase change through the API. A failure keeps the editor open with the entered reason. */
+  onSave: (to: QuotationPhase, reason?: string) => Promise<SaveResult>;
+  /** Re-reads the quotations after a 409 conflict. The entered values stay in the editor. */
+  onReload?: () => void;
+  reloading?: boolean;
 }
 
 /** Status select, reason field (Lost and Reopen) and Save. Remounted by the parent when the phase changes. */
-function StatusEditor({ q, onSave }: { q: Quotation; onSave: StatusEditorProps['onSave'] }) {
+function StatusEditor({ q, onSave, onReload, reloading }: { q: Quotation } & StatusEditorProps) {
   const [selected, setSelected] = useState<QuotationPhase>(q.phase);
   const [reason, setReason] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [saving, setSaving] = useState(false);
   const options = statusOptions(q.phase);
   const state = panelState(q.phase, selected, reason);
   const reasonCheck = validateReason(reason);
   const reasonMessage = state.needsReason && !reasonCheck.ok ? reasonCheck.message : null;
   const label = selected === 'Lost' ? 'Lost reason' : 'Reopen reason';
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await onSave(selected, state.needsReason && reasonCheck.ok ? reasonCheck.reason : undefined);
+      if (!res.ok) setError(res.error ?? new Error('Could not change the status'));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-3 rounded-md border border-border p-3" data-testid="status-editor">
@@ -123,16 +142,10 @@ function StatusEditor({ q, onSave }: { q: Quotation; onSave: StatusEditorProps['
           {reasonMessage && <p role="alert" className="text-xs text-destructive">{reasonMessage}</p>}
         </div>
       )}
-      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {error != null && <ApiErrorNotice error={error} onReload={onReload} reloading={reloading} />}
       <div className="flex justify-end">
-        <Button
-          disabled={!state.canSave}
-          onClick={() => {
-            const res = onSave(selected, state.needsReason && reasonCheck.ok ? reasonCheck.reason : undefined);
-            if (!res.ok) setError(res.error ?? 'Could not change the status');
-          }}
-        >
-          Save
+        <Button disabled={!state.canSave || saving} onClick={() => void save()}>
+          {saving ? 'Saving...' : 'Save'}
         </Button>
       </div>
     </div>
@@ -140,16 +153,20 @@ function StatusEditor({ q, onSave }: { q: Quotation; onSave: StatusEditorProps['
 }
 
 export function QuotationDetail({
-  q, onClose, statusEditor,
-}: { q: Quotation | null; onClose: () => void; statusEditor?: StatusEditorProps }) {
+  q, onClose, statusEditor, history, historyLoading,
+}: {
+  q: Quotation | null; onClose: () => void; statusEditor?: StatusEditorProps;
+  /** Phase history read from the API; falls back to the history carried by the quotation. */
+  history?: PhaseHistoryEntry[]; historyLoading?: boolean;
+}) {
   const invoices = useInvoicesForQuotation(q?.id ?? '');
   return (
     <SlideOver open={!!q} onClose={onClose} title={q?.opportunity ?? ''} description={q ? `${q.number} · ${q.customerName}` : undefined} width="md">
       {q && (
         <div className="space-y-6">
-          {statusEditor && <StatusEditor key={`${q.id}:${q.phase}`} q={q} onSave={statusEditor.onSave} />}
+          {statusEditor && <StatusEditor key={`${q.id}:${q.phase}`} q={q} {...statusEditor} />}
           <InfoGrid>
-            <InfoRow label="Hire Agreement No." value={q.hireAgreementNo} />
+            <InfoRow label="Hire Agreement No." value={q.hireAgreementNo || '-'} />
             <InfoRow label="Email" value={q.email ?? '-'} />
             <InfoRow label="Stage" value={<PhaseBadge phase={q.phase} />} />
             <InfoRow label="Expected revenue" value={formatCurrency(q.amount, q.currency)} />
@@ -182,8 +199,9 @@ export function QuotationDetail({
           </div>
           <div>
             <SectionTitle>Phase history</SectionTitle>
+            {historyLoading && <p className="mt-2 text-sm text-muted-foreground">Loading history...</p>}
             <ul className="mt-2 space-y-2 text-sm">
-              {[...q.history].reverse().map((h) => (
+              {[...(history ?? q.history)].reverse().map((h) => (
                 <li key={h.id} className="rounded-md border border-border p-2">
                   <div className="font-medium">
                     {h.fromPhase ? `${h.fromPhase} → ${h.toPhase}` : `Created as ${h.toPhase}`}
@@ -200,47 +218,62 @@ export function QuotationDetail({
   );
 }
 
+export interface NewQuotationDraft {
+  /** API customer id */
+  customerId: string;
+  opportunity: string;
+  email?: string;
+  amount: number;
+  validUntil?: string;
+  notes?: string;
+}
+
 export function NewQuotationDialog({
-  open, quotations, salesperson, onClose, onCreate,
+  open, customers, salesperson, onClose, onCreate,
 }: {
-  open: boolean; quotations: Quotation[]; salesperson: string; onClose: () => void;
-  onCreate: (d: QuotationDraft) => void;
+  open: boolean; customers: CustomerRecord[]; salesperson: string; onClose: () => void;
+  /** Creates the quotation through the API. On failure the dialog stays open with every entered value. */
+  onCreate: (d: NewQuotationDraft) => Promise<SaveResult>;
 }) {
-  const companies = companiesOf(quotations);
-  const [haInput, setHaInput] = useState('');
-  const [haTouched, setHaTouched] = useState(false);
   const [opportunity, setOpportunity] = useState('');
-  const [contactName, setContactName] = useState('');
+  const [customerId, setCustomerId] = useState('');
   const [email, setEmail] = useState('');
   const [amount, setAmount] = useState('');
   const [validUntil, setValidUntil] = useState('');
   const [notes, setNotes] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const [saving, setSaving] = useState(false);
 
-  const norm = (s: string) => s.trim().toLowerCase();
-  const byName = companies.find((c) => contactName.trim() && norm(c.customerName) === norm(contactName));
-  // Until the user edits the number: an existing company's number if the name matches, else the next free one.
-  const suggested = byName ? byName.hireAgreementNo : nextHireAgreementNo(quotations);
-  const haNo = haTouched ? haInput.trim() : suggested;
-  const match = companies.find((c) => norm(c.hireAgreementNo) === norm(haNo));
-  const isExisting = !!match;
-  const valid = opportunity.trim() && contactName.trim() && haNo && Number(amount) > 0;
+  const valid = opportunity.trim() && customerId && Number(amount) > 0;
 
   const reset = () => {
-    setHaInput(''); setHaTouched(false); setOpportunity(''); setContactName(''); setEmail('');
-    setAmount(''); setValidUntil(''); setNotes('');
+    setOpportunity(''); setCustomerId(''); setEmail(''); setAmount(''); setValidUntil(''); setNotes(''); setError(null);
   };
   const close = () => { reset(); onClose(); };
 
-  const onHaChange = (v: string) => {
-    setHaInput(v); setHaTouched(true);
-    // An existing number was entered: fill in that company's details.
-    const m = companies.find((c) => norm(c.hireAgreementNo) === norm(v));
-    if (m) { setContactName(m.customerName); setEmail(m.email ?? ''); }
+  const onCustomerChange = (id: string) => {
+    setCustomerId(id);
+    const c = customers.find((x) => x.id === id);
+    if (c && !email) setEmail(c.email ?? '');
   };
-  const onNameChange = (v: string) => {
-    setContactName(v);
-    const m = companies.find((c) => v.trim() && norm(c.customerName) === norm(v));
-    if (m && !email) setEmail(m.email ?? '');
+
+  const submit = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await onCreate({
+        customerId,
+        opportunity: opportunity.trim(),
+        email: email.trim() || undefined,
+        amount: Number(amount),
+        validUntil: validUntil || undefined,
+        notes: notes || undefined,
+      });
+      if (res.ok) reset();
+      else setError(res.error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -249,44 +282,25 @@ export function NewQuotationDialog({
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={close}>Cancel</Button>
-          <Button disabled={!valid} onClick={() => {
-            onCreate({
-              opportunity: opportunity.trim(),
-              customerName: contactName.trim(),
-              customerId: match?.customerId,
-              email: email.trim() || undefined,
-              hireAgreementNo: haNo,
-              amount: Number(amount),
-              validUntil: validUntil || undefined,
-              notes: notes || undefined,
-            });
-            reset();
-          }}>Create</Button>
+          <Button disabled={!valid || saving} onClick={() => void submit()}>{saving ? 'Creating...' : 'Create'}</Button>
         </div>
       }
     >
       <div className="space-y-4">
-        <Field label="Hire Agreement No.">
-          <Input
-            list="crm-ha-options" value={haTouched ? haInput : suggested}
-            onChange={(e) => onHaChange(e.target.value)} placeholder="HA-2026-00001"
-          />
-          <datalist id="crm-ha-options">
-            {companies.map((c) => (
-              <option key={c.hireAgreementNo} value={c.hireAgreementNo}>{c.customerName}</option>
-            ))}
-          </datalist>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {isExisting
-              ? `Existing agreement of ${match!.customerName}. This quotation is added under the same number.`
-              : 'Auto-generated for a new company. Edit it, or pick/enter an old number to reuse it.'}
-          </p>
+        {error != null && <ApiErrorNotice error={error} />}
+        <Field label="Customer">
+          <select
+            aria-label="Customer"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            value={customerId} onChange={(e) => onCustomerChange(e.target.value)}
+          >
+            <option value="">Select a customer</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.customerName} ({c.customerId})</option>)}
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">The hire agreement number is allocated when the agreement is created.</p>
         </Field>
         <Field label="Opportunity">
           <Input placeholder="e.g. ABC Company - Boom Lift Hire" value={opportunity} onChange={(e) => setOpportunity(e.target.value)} />
-        </Field>
-        <Field label="Contact Name">
-          <Input placeholder="Company / contact name" value={contactName} onChange={(e) => onNameChange(e.target.value)} />
         </Field>
         <Field label="Email">
           <Input type="email" placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />

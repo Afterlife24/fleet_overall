@@ -14,6 +14,8 @@ export const queryClient = new QueryClient({
 
 /** Clear all cached queries — called when switching org (login/logout). */
 export function resetQueryCache() {
+  // Cancel in-flight fetches first so a response for the old scope cannot repopulate the cleared cache.
+  void queryClient.cancelQueries();
   queryClient.clear();
 }
 

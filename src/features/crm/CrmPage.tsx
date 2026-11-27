@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/common/PageHeader';
 import { KPICard } from '@/components/common/KPICard';
@@ -7,10 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
 import { useOrgStore } from '@/store/orgStore';
-import { useCrmStore } from '@/store/crmStore';
-import { useCustomerStore } from '@/store/customerStore';
-import { registryCustomers } from '@/services/services';
-import { ensureHireLinkDemo } from '@/services/demoSeed';
+import { ApiErrorNotice, ApiSessionGate, errorText } from '@/components/common/ApiStatus';
+import { LoadingState } from '@/components/common/EmptyState';
+import {
+  useChangePhase, useCreateQuotation, useCrmData, useCustomerRecords, useQuotationHistory,
+} from '@/hooks/useApiResources';
+import { newSubmissionId } from '@/services/api/idempotency';
+import { phaseToApi } from '@/services/api/mappers';
+import { useSessionStore } from '@/services/api/session';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { toastError, toastSuccess } from '@/lib/toast-helper';
 import { cn } from '@/lib/utils';
@@ -23,7 +27,7 @@ import {
   byPhase, filterList, pipelineOf, pipelineTotals, searchLost, toInvoicePrefill,
 } from './crmRules';
 import {
-  NewQuotationDialog, PhaseBadge, QuotationDetail, ReasonDialog,
+  NewQuotationDialog, PhaseBadge, QuotationDetail, ReasonDialog, type SaveResult,
 } from './CrmShared';
 
 type Tab = 'pipeline' | 'list' | 'lost' | 'won';
@@ -34,7 +38,16 @@ function tabFromPath(path: string): Tab {
   return 'pipeline';
 }
 
+/** CRM pipeline and Status panel. Reads and writes `/api/v1/quotations`; waits for the API session. */
 export function CrmPage() {
+  return (
+    <ApiSessionGate>
+      <CrmScreen />
+    </ApiSessionGate>
+  );
+}
+
+function CrmScreen() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -43,12 +56,15 @@ export function CrmPage() {
   const isAppActive = useOrgStore((s) => s.isAppActive);
   const invoiceActive = isAppActive(orgId, 'invoice');
 
-  const all = useCrmStore((s) => s.quotations);
-  const create = useCrmStore((s) => s.create);
-  const changePhase = useCrmStore((s) => s.changePhase);
-  const quotations = useMemo(() => all.filter((q) => q.orgId === orgId), [all, orgId]);
-  // Load the demo quotations for this company the first time CRM is opened.
-  useEffect(() => { ensureHireLinkDemo(orgId); }, [orgId]);
+  const crm = useCrmData();
+  const customers = useCustomerRecords();
+  const createQuotation = useCreateQuotation();
+  const changePhase = useChangePhase();
+  const all = crm.data?.quotations;
+  const quotations = useMemo(() => (all ?? []).filter((q) => q.orgId === orgId), [all, orgId]);
+  // One submission id per (quotation, from, to) change: a retry of the same change reuses its Idempotency-Key.
+  const submissions = useRef(new Map<string, string>());
+  const createSubmission = useRef(newSubmissionId());
 
   const routeTab = tabFromPath(pathname);
   const [pipelineView, setPipelineView] = useState<'pipeline' | 'list'>('pipeline');
@@ -60,21 +76,33 @@ export function CrmPage() {
   const [newOpen, setNewOpen] = useState(false);
 
   const detail = quotations.find((q) => q.id === detailId) ?? null;
+  const history = useQuotationHistory(detailId);
   const totals = pipelineTotals(quotations);
 
   /** The only caller of changePhase. Shared by the Status panel, drag and drop and the reason dialogs. */
-  const move = (q: Quotation, to: QuotationPhase, reason?: string): { ok: boolean; error?: string } => {
-    const res = changePhase(q.id, to, userName, reason);
-    if (!res.ok) { toastError(res.error); return { ok: false, error: res.error }; }
-    toastSuccess(`${q.opportunity} moved to ${to}`);
-    return { ok: true };
+  const move = async (q: Quotation, to: QuotationPhase, reason?: string): Promise<SaveResult> => {
+    const key = `${q.id}:${q.phase}:${to}`;
+    let submissionId = submissions.current.get(key);
+    if (!submissionId) { submissionId = newSubmissionId(); submissions.current.set(key, submissionId); }
+    try {
+      await changePhase.mutateAsync({
+        id: q.id, rowVersion: q.rowVersion ?? 0, submissionId,
+        input: { toPhase: phaseToApi(to), ...(reason ? { reason } : {}) },
+      });
+      submissions.current.delete(key);
+      toastSuccess(`${q.opportunity} moved to ${to}`);
+      return { ok: true };
+    } catch (error) {
+      toastError(errorText(error));
+      return { ok: false, error };
+    }
   };
 
   const dropPhase = (q: Quotation, to: QuotationPhase) => {
     const req = planPhaseRequest(q.phase, to);
     if (req.kind === 'reject') toastError(req.error);
     else if (req.kind === 'needsReason') (req.label === 'Lost' ? setLostTarget : setReopenTarget)(q);
-    else move(q, to);
+    else void move(q, to);
   };
 
   const proceedToInvoice = (q: Quotation) =>
@@ -117,7 +145,10 @@ export function CrmPage() {
         <TabBtn id="won" label="Won" count={byPhase(quotations, 'Won').length} to="/crm/won" />
       </div>
 
-      {tab === 'pipeline' && (
+      {crm.isError && <ApiErrorNotice error={crm.error} onRetry={() => void crm.refetch()} />}
+      {crm.isLoading && <LoadingState />}
+
+      {!crm.isLoading && !crm.isError && tab === 'pipeline' && (
         <PipelineBoard
           quotations={quotations}
           selectedId={detailId}
@@ -125,11 +156,11 @@ export function CrmPage() {
           onDropPhase={dropPhase}
         />
       )}
-      {tab === 'list' && <ListView quotations={quotations} onOpen={(q) => setDetailId(q.id)} />}
-      {tab === 'lost' && (
+      {!crm.isLoading && !crm.isError && tab === 'list' && <ListView quotations={quotations} onOpen={(q) => setDetailId(q.id)} />}
+      {!crm.isLoading && !crm.isError && tab === 'lost' && (
         <LostView quotations={quotations} onOpen={(q) => setDetailId(q.id)} onReopen={setReopenTarget} />
       )}
-      {tab === 'won' && (
+      {!crm.isLoading && !crm.isError && tab === 'won' && (
         <WonView
           quotations={quotations} invoiceActive={invoiceActive}
           onOpen={(q) => setDetailId(q.id)} onInvoice={proceedToInvoice}
@@ -138,29 +169,41 @@ export function CrmPage() {
 
       <QuotationDetail
         q={detail} onClose={() => setDetailId(null)}
-        statusEditor={detail ? { onSave: (to, reason) => move(detail, to, reason) } : undefined}
+        history={history.data} historyLoading={history.isLoading}
+        statusEditor={detail ? { onSave: (to, reason) => move(detail, to, reason), onReload: () => void crm.refetch(), reloading: crm.isFetching } : undefined}
       />
       <ReasonDialog
         open={!!lostTarget} title="Mark as Lost" description={lostTarget?.number}
         submitLabel="Mark Lost" presets={DEFAULT_LOST_REASONS}
         onClose={() => setLostTarget(null)}
-        onSubmit={(reason) => { if (lostTarget && move(lostTarget, 'Lost', reason).ok) setLostTarget(null); }}
+        onSubmit={(reason) => { if (lostTarget) void move(lostTarget, 'Lost', reason).then((r) => { if (r.ok) setLostTarget(null); }); }}
       />
       <ReasonDialog
         open={!!reopenTarget} title="Reopen quotation" description={reopenTarget?.number}
         submitLabel="Reopen"
         onClose={() => setReopenTarget(null)}
-        onSubmit={(reason) => { if (reopenTarget && move(reopenTarget, 'Awaiting', reason).ok) setReopenTarget(null); }}
+        onSubmit={(reason) => { if (reopenTarget) void move(reopenTarget, 'Awaiting', reason).then((r) => { if (r.ok) setReopenTarget(null); }); }}
       />
       <NewQuotationDialog
-        open={newOpen} quotations={quotations} salesperson={userName} onClose={() => setNewOpen(false)}
-        onCreate={(d) => {
-          // TODO(7.4): call ensureRentalDemo(orgId) instead, so all nine demo customers exist before the lookup.
-          registryCustomers(orgId);
-          const customer = useCustomerStore.getState().findOrCreate(orgId, d.customerName);
-          const q = create(orgId, { ...d, customerId: customer.customerId, customerName: customer.customerName }, userName);
-          toastSuccess(`${q.opportunity} created (${q.hireAgreementNo})`);
-          setNewOpen(false);
+        open={newOpen} customers={(customers.data ?? []).filter((c) => c.status === 'Active')} salesperson={userName}
+        onClose={() => setNewOpen(false)}
+        onCreate={async (d) => {
+          try {
+            const q = await createQuotation.mutateAsync({
+              submissionId: createSubmission.current,
+              body: {
+                customerId: d.customerId, opportunity: d.opportunity, email: d.email ?? null, amount: d.amount,
+                validUntil: d.validUntil ?? null, notes: d.notes ?? null,
+                salesUserId: useSessionStore.getState().session?.user.id ?? null,
+              },
+            });
+            createSubmission.current = newSubmissionId();
+            toastSuccess(`${q.opportunity} created (${q.quotationNo})`);
+            setNewOpen(false);
+            return { ok: true };
+          } catch (error) {
+            return { ok: false, error };
+          }
         }}
       />
     </div>

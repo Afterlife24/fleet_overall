@@ -6,8 +6,9 @@ import { SlideOver } from '@/components/common/SlideOver';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { InfoGrid, InfoRow, SectionTitle } from '@/components/common/InfoGrid';
 import { Button } from '@/components/ui/button';
-import { LoadingState, ErrorState } from '@/components/common/EmptyState';
-import { useCustomerANIs, useUpdateCustomerANI, useDeleteCustomerANI } from '@/hooks/useQueries';
+import { LoadingState } from '@/components/common/EmptyState';
+import { useArchiveCustomer, useCustomerRecords, useUpdateCustomer } from '@/hooks/useApiResources';
+import { ApiErrorNotice, ApiSessionGate, errorText } from '@/components/common/ApiStatus';
 import { AppOnboarding } from '@/features/apps/AppOnboarding';
 import { useAppOnboarding } from '@/hooks/useAppOnboarding';
 import type { CustomerANI, CustomerANIStatus } from '@/types/customerani';
@@ -18,14 +19,23 @@ import { CustomerLinksSection } from './CustomerLinksSection';
 import {
   Plus, Users2, Download, Filter, WifiHigh, Building2, CreditCard,
 } from 'lucide-react';
-import { toastSuccess } from '@/lib/toast-helper';
+import { toastError, toastSuccess } from '@/lib/toast-helper';
 
-const STATUSES: (CustomerANIStatus | 'All')[] = ['All', 'Active', 'Inactive', 'Suspended'];
+const STATUSES: (CustomerANIStatus | 'All')[] = ['All', 'Active', 'Inactive', 'Suspended', 'Blacklisted'];
 
+/** Customers screen. Reads and writes `/api/v1/customers`; waits for the API session. */
 export function CustomerANIPage() {
-  const { data: records, isLoading, isError, refetch } = useCustomerANIs();
-  const updateMutation = useUpdateCustomerANI();
-  const deleteMutation = useDeleteCustomerANI();
+  return (
+    <ApiSessionGate>
+      <CustomersScreen />
+    </ApiSessionGate>
+  );
+}
+
+function CustomersScreen() {
+  const { data: records, isLoading, isError, error, refetch } = useCustomerRecords();
+  const updateMutation = useUpdateCustomer();
+  const archiveMutation = useArchiveCustomer();
   const onboarding = useAppOnboarding('customer_ani', records?.length ?? 0);
 
   const [statusFilter, setStatusFilter] = useState<CustomerANIStatus | 'All'>('All');
@@ -41,7 +51,7 @@ export function CustomerANIPage() {
     [records, statusFilter]
   );
 
-  if (isError) return <ErrorState onRetry={() => refetch()} />;
+  if (isError) return <ApiErrorNotice error={error} onRetry={() => void refetch()} />;
 
   if (!isLoading && onboarding.showOnboarding) {
     return (
@@ -93,14 +103,17 @@ export function CustomerANIPage() {
 
   const toggleANI = (record: CustomerANI) => {
     updateMutation.mutate(
-      { id: record.id, data: { aniRavaliActive: !record.aniRavaliActive } },
+      { id: record.id, rowVersion: record.rowVersion ?? 0, patch: { aniRavaliActive: !record.aniRavaliActive } },
       {
-        onSuccess: () =>
+        onSuccess: (dto) => {
+          setSelected((cur) => (cur && cur.id === dto.id ? { ...cur, aniRavaliActive: dto.aniRavaliActive, rowVersion: dto.rowVersion } : cur));
           toastSuccess(
             record.aniRavaliActive
               ? `ANI Ravali deactivated for ${record.customerName}`
               : `ANI Ravali activated for ${record.customerName}`
-          ),
+          );
+        },
+        onError: (err) => { toastError(errorText(err)); void refetch(); },
       }
     );
   };
@@ -187,7 +200,8 @@ export function CustomerANIPage() {
               <Button
                 size="sm"
                 variant={selected.aniRavaliActive ? 'outline' : 'default'}
-                onClick={() => { toggleANI(selected); setSelected({ ...selected, aniRavaliActive: !selected.aniRavaliActive }); }}
+                disabled={updateMutation.isPending}
+                onClick={() => toggleANI(selected)}
                 className={cn(selected.aniRavaliActive && 'text-rose-600 hover:text-rose-700 dark:text-rose-400')}
               >
                 {selected.aniRavaliActive ? 'Deactivate' : 'Activate'}
@@ -241,13 +255,16 @@ export function CustomerANIPage() {
                 size="sm"
                 variant="outline"
                 className="text-rose-600 hover:text-rose-700 dark:text-rose-400"
+                disabled={archiveMutation.isPending || selected.status === 'Inactive'}
+                title="Customers are archived (set Inactive), never deleted"
                 onClick={() => {
-                  deleteMutation.mutate(selected.id, {
-                    onSuccess: () => { toastSuccess('Customer deleted'); setSelected(null); },
+                  archiveMutation.mutate({ id: selected.id, rowVersion: selected.rowVersion ?? 0 }, {
+                    onSuccess: () => { toastSuccess('Customer archived'); setSelected(null); },
+                    onError: (err) => { toastError(errorText(err)); void refetch(); },
                   });
                 }}
               >
-                Delete
+                Archive
               </Button>
             </div>
           </div>

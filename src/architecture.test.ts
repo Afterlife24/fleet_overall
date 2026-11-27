@@ -87,14 +87,6 @@ describe('architecture: plugin boundaries', () => {
     expect(bad).toEqual([]);
   });
 
-  it('invoiceRulesCore.ts imports only types', () => {
-    const source = read('services/invoiceRulesCore.ts');
-    const stmts = importStatements(source);
-    const valueImports = stmts.filter((s) => !/^\s*(?:import|export)\s+type\b/.test(s));
-    expect(valueImports).toEqual([]);
-    expect(source).not.toMatch(/\brequire\s*\(|\bimport\s*\(/);
-  });
-
   it('collectionCore.ts imports only types', () => {
     const source = read('services/collectionCore.ts');
     const stmts = importStatements(source);
@@ -197,7 +189,7 @@ describe('architecture: plugin boundaries', () => {
       const re =
         /\bstatus\s*:\s*['"]Collected['"]|\bstatus\s*=\s*['"]Collected['"]|\b(?:setValue|set|patch)\s*\([^)]*['"]Collected['"]/;
       const servicesAllowed = (rel: string) =>
-        rel === 'services/collectionDocs.ts' || rel === 'services/demoSeed.ts' || rel.startsWith('services/mock/');
+        rel === 'services/collectionDocs.ts' || rel.startsWith('services/mock/');
       const offenders = prod
         .filter((f) => !f.rel.startsWith('features/gate/'))
         .filter((f) => !servicesAllowed(f.rel))
@@ -214,20 +206,11 @@ describe('architecture: plugin boundaries', () => {
     });
 
     it('only the gate feature and gate-owning services import the gate store', () => {
-      const allowed = ['store/gateStore.ts', 'services/services.ts', 'services/demoSeed.ts'];
+      const allowed = ['store/gateStore.ts'];
       const offenders = prod
         .filter((f) => !allowed.includes(f.rel) && !f.rel.startsWith('features/gate/'))
         .filter((f) => specifiers(f.source).some((s) => /(^|\/)store\/gateStore$/.test(s)))
         .map((f) => f.rel);
-      expect(offenders).toEqual([]);
-    });
-
-    it('demoGate.ts imports only gateCore, collectionCore, demoHireLink and types', () => {
-      const source = read('services/mock/demoGate.ts');
-      const valueImports = importStatements(source).filter((s) => !/^\s*(?:import|export)\s+type\b/.test(s));
-      const offenders = valueImports.filter(
-        (s) => !/from\s+['"][^'"]*\b(?:gateCore|collectionCore|demoHireLink)['"]/.test(s),
-      );
       expect(offenders).toEqual([]);
     });
   });

@@ -1,10 +1,6 @@
 import type { Machine } from '@/types/machine';
 import type { MachineLite } from '@/services/collectionCore';
-import type { MachineResolver, TransportJobCallback } from '@/services/collectionDocs';
-import { useAppStore } from '@/store/appStore';
-import { useTransportStore } from '@/store/transportStore';
-import { transportJobFromCollection } from '@/services/transportCore';
-import { machinesForOrg } from '@/services/mock/orgData';
+import type { MachineResolver } from '@/services/collectionDocs';
 
 export const toMachineLite = (m: Machine, orgId: string): MachineLite => ({
   orgId,
@@ -16,17 +12,13 @@ export const toMachineLite = (m: Machine, orgId: string): MachineLite => ({
   serialNumber: m.serialNumber,
 });
 
-/** Machine resolver backed by the app store / mock org data. */
-export const appMachineResolver: MachineResolver = {
-  list: (orgId) => machinesForOrg(orgId).map((m) => toMachineLite(m, orgId)),
-  statusOf: (id) => useAppStore.getState().getMachineCurrentStatus(id),
-};
-
-/** Writes the collection-generated job to the company's transport store with a fresh TJ- reference. */
-export const appCreateTransportJob: TransportJobCallback = (cn) => {
-  const store = useTransportStore.getState();
-  const now = new Date();
-  const ref = store.issueRef(cn.orgId, now.getFullYear());
-  const machine = machinesForOrg(cn.orgId).find((m) => m.id === cn.machineId);
-  store.add(transportJobFromCollection(cn, ref, `tj-${cn.id}`, now.toISOString(), machine));
-};
+/**
+ * Machine resolver for QR / deep-link lookups over the machines read from `/api/v1/machines`
+ * (the Fleet screen's `useFleetMachines`). Collection itself starts from a booking (see `InitiateDialog`).
+ */
+export function machineResolverFor(machines: readonly Machine[]): MachineResolver {
+  return {
+    list: (orgId) => machines.map((m) => toMachineLite(m, orgId)),
+    statusOf: (id) => machines.find((m) => m.id === id)?.status ?? '',
+  };
+}

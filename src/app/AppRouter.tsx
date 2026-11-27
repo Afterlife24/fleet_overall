@@ -37,6 +37,8 @@ const SixSigmaPage = lazy(() => import('@/features/sixsigma/SixSigmaPage').then(
 const StatisticsPage = lazy(() => import('@/features/statistics/StatisticsPage').then(m => ({ default: m.StatisticsPage })));
 const BranchesPage = lazy(() => import('@/features/branches/BranchesPage').then(m => ({ default: m.BranchesPage })));
 const DocumentAppPage = lazy(() => import('@/features/documents/DocumentAppPage').then(m => ({ default: m.DocumentAppPage })));
+const DeliveryNotePage = lazy(() => import('@/features/documents/DeliveryNotePage').then(m => ({ default: m.DeliveryNotePage })));
+const LpoPage = lazy(() => import('@/features/documents/LpoPage').then(m => ({ default: m.LpoPage })));
 const NotFoundPage = lazy(() => import('@/features/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 const CustomerANIPage = lazy(() => import('@/features/customerani/CustomerANIPage').then(m => ({ default: m.CustomerANIPage })));
 const CrmPage = lazy(() => import('@/features/crm/CrmPage').then(m => ({ default: m.CrmPage })));
@@ -155,8 +157,8 @@ export function AppRouter() {
           <Route path="/statistics" element={<AppGuard><Suspense fallback={<LoadingState />}><StatisticsPage /></Suspense></AppGuard>} />
           <Route path="/branches" element={<AppGuard><Suspense fallback={<LoadingState />}><BranchesPage /></Suspense></AppGuard>} />
           <Route path="/docs/quotation" element={<AppGuard><Suspense fallback={<LoadingState />}><HireAgreementPage /></Suspense></AppGuard>} />
-          <Route path="/docs/lpo" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="lpo" /></Suspense></AppGuard>} />
-          <Route path="/docs/delivery-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="delivery_note" /></Suspense></AppGuard>} />
+          <Route path="/docs/lpo" element={<AppGuard><Suspense fallback={<LoadingState />}><LpoPage /></Suspense></AppGuard>} />
+          <Route path="/docs/delivery-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DeliveryNotePage /></Suspense></AppGuard>} />
           <Route path="/docs/collection-note" element={<AppGuard><Suspense fallback={<LoadingState />}><CollectionNoteRoute /></Suspense></AppGuard>} />
           <Route path="/docs/third-party-services" element={<AppGuard><Suspense fallback={<LoadingState />}><ThirdPartyServicesPage /></Suspense></AppGuard>} />
           <Route path="/docs/invoice" element={<AppGuard><Suspense fallback={<LoadingState />}><InvoicePage /></Suspense></AppGuard>} />

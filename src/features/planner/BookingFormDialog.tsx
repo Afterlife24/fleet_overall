@@ -1,53 +1,43 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useCustomers, useMachines, useBranches, useHireAgreementOptions } from '@/hooks/useQueries';
-import { toastSuccess, toastError } from '@/lib/toast-helper';
-import * as hireLink from '@/services/hireLink';
-import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
-import { buildBookingRecord } from './bookingRecord';
+import { describeApiError } from '@/components/common/ApiStatus';
+import { useApiBranches, useFleetMachines, useLpos } from '@/hooks/useApiResources';
+import {
+  fetchBooking, useCreateBooking, usePlannerAgreements, usePlannerCustomers, useSubmission, useUpdateBooking,
+} from '@/hooks/api/usePlannerApi';
+import { toastSuccess } from '@/lib/toast-helper';
 import { Booking } from '@/types';
-import { useBookingStore, computeTotalValue, computeBookingStatus } from '@/store/bookingStore';
+import { computeTotalValue } from '@/store/bookingStore';
 import { CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
+import { BookingErrorNotice } from './BookingErrorNotice';
+import { buildBookingCreate, buildBookingUpdate, planningStatus } from './bookingRecord';
 
 const bookingSchema = z.object({
   customerId:       z.string().min(1, 'Customer is required'),
   machineId:        z.string().min(1, 'Machine is required'),
+  branchId:         z.string().optional(),
   startDate:        z.string().min(1, 'Start date is required'),
   endDate:          z.string().min(1, 'End date is required'),
-  period:           z.enum(['Daily', 'Weekly', 'Monthly', '2-Day', '1-Day']),
-  time:             z.enum(['AM', 'PM', 'Specific']).default('AM'),
-  specificTime:     z.string().optional(),
   dailyRate:        z.coerce.number().positive('Rate must be positive'),
   deliveryAddress:  z.string().min(5, 'Delivery address is required'),
-  siteContactName:  z.string().min(2, 'Site contact name required'),
-  siteContactPhone: z.string().regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone number'),
-  branchId:         z.string().min(1, 'Branch is required'),
+  siteContactPhone: z.string().regex(/^[\d\s+\-()]+$/, 'Invalid phone number'),
   operatorRequired: z.boolean().default(false),
-  // Legal Dispatch Gates
   quoted:           z.boolean().default(false),
-  haSent:           z.boolean().default(false),
-  haReceived:       z.boolean().default(false),
-  lpoNumber:        z.string().optional(),
-  lpoValidityDate:  z.string().optional(),
-  // Sales & Payment
-  salesRep:         z.enum(['BG', 'AD', 'CH', 'AM', 'SM', 'SK', 'TD', 'SH', 'MT']).optional(),
-  paymentTerms:     z.enum(['30', '45', '60', '90', 'Cash Advance', 'PDC']).optional(),
+  hireAgreementId:  z.string().optional(),
+  lpoId:            z.string().optional(),
   remarks:          z.string().optional(),
   reserved:         z.boolean().default(false),
-  hireAgreementId:  z.string().optional(),
 }).refine(d => !d.endDate || !d.startDate || new Date(d.endDate) >= new Date(d.startDate), {
-  message: 'End date must be after start date',
+  message: 'End date must be on or after the start date',
   path: ['endDate'],
 });
 
@@ -60,149 +50,120 @@ interface BookingFormDialogProps {
   defaultBranchId?: string;
 }
 
+const UNBOOKABLE = new Set(['Offline', 'Under Repair', 'Breakdown']);
+const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm';
+
+function defaults(booking: Booking | null | undefined, defaultBranchId?: string): BookingFormData {
+  return booking
+    ? {
+        customerId: booking.customerId, machineId: booking.machineId, branchId: booking.branchId,
+        startDate: booking.startDate, endDate: booking.endDate, dailyRate: booking.dailyRate,
+        deliveryAddress: booking.deliveryAddress, siteContactPhone: booking.contactPhone,
+        operatorRequired: booking.operatorRequired ?? false, quoted: booking.quoted ?? false,
+        hireAgreementId: booking.hireAgreementId ?? '', lpoId: booking.lpoId ?? '',
+        remarks: booking.notes ?? '', reserved: booking.reserved ?? false,
+      }
+    : {
+        customerId: '', machineId: '', branchId: defaultBranchId ?? '', startDate: '', endDate: '', dailyRate: 0,
+        deliveryAddress: '', siteContactPhone: '', operatorRequired: false, quoted: false, hireAgreementId: '',
+        lpoId: '', remarks: '', reserved: false,
+      };
+}
+
+/** Create or edit a booking through `/api/v1/bookings`. Edits send the row version; entered values survive an error. */
 export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: BookingFormDialogProps) {
-  const { data: customers } = useCustomers();
-  const { data: machines }  = useMachines();
-  const { data: branches }  = useBranches();
-  const { addBooking, updateBooking } = useBookingStore();
-  const userBookings = useBookingStore(s => s.userBookings);
+  const customers = usePlannerCustomers();
+  const machines = useFleetMachines();
+  const branches = useApiBranches();
+  const agreements = usePlannerAgreements();
+  const lpos = useLpos();
+  const create = useCreateBooking();
+  const update = useUpdateBooking();
+  const submission = useSubmission();
+
+  // The loaded booking the edit is compared with; "Reload latest" replaces it without touching entered values.
+  const [baseline, setBaseline] = useState<Booking | null>(booking ?? null);
+  const [error, setError] = useState<unknown>(null);
+  const [saving, setSaving] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const isEditing = !!booking;
-  const isDemoBooking = !!booking && !userBookings.some(b => b.id === booking.id);
+  const onHire = baseline?.status === 'On Hire';
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
-    defaultValues: booking ? {
-      customerId:       booking.customerId,
-      machineId:        booking.machineId,
-      startDate:        booking.startDate,
-      endDate:          booking.endDate,
-      period:           (booking as any).period || 'Monthly',
-      time:             (booking as any).time || 'AM',
-      dailyRate:        booking.dailyRate,
-      deliveryAddress:  booking.deliveryAddress,
-      branchId:         booking.branchId,
-      operatorRequired: booking.operatorRequired ?? false,
-      quoted:           (booking as any).quoted ?? false,
-      haSent:           (booking as any).haSent ?? false,
-      haReceived:       (booking as any).haReceived ?? false,
-      lpoNumber:        (booking as any).lpoNumber ?? '',
-      lpoValidityDate:  (booking as any).lpoValidityDate ?? '',
-      reserved:         false,
-      hireAgreementId:  booking.hireAgreementId ?? '',
-    } : {
-      period:           'Monthly',
-      time:             'AM',
-      dailyRate:        0,
-      branchId:         defaultBranchId ?? '',
-      operatorRequired: false,
-      quoted:           false,
-      haSent:           false,
-      haReceived:       false,
-      reserved:         false,
-      hireAgreementId:  '',
-    },
+    defaultValues: defaults(booking, defaultBranchId),
   });
 
-  // Watch fields for live calculations
-  const watchedFields = form.watch();
-  const { startDate, endDate, dailyRate, quoted, haSent, haReceived, lpoNumber, lpoValidityDate, reserved, branchId } = watchedFields;
+  useEffect(() => {
+    if (!open) return;
+    setBaseline(booking ?? null);
+    setError(null);
+    form.reset(defaults(booking, defaultBranchId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, booking?.id]);
 
-  const selectedCustomerName = customers?.find(c => c.id === watchedFields.customerId)?.name;
-  const { data: agreementOptions } = useHireAgreementOptions(selectedCustomerName);
-  const watchedAgreementId = (watchedFields.hireAgreementId ?? '').trim();
-  const linkSummary = watchedAgreementId ? hireLink.describeLink(watchedAgreementId) : undefined;
+  const values = form.watch();
+  const { startDate, endDate, dailyRate, customerId, branchId } = values;
 
-  // Live Total Value
-  const totalValue = useMemo(
-    () => computeTotalValue(dailyRate, startDate, endDate),
-    [dailyRate, startDate, endDate]
+  const customerAgreements = useMemo(
+    () => (agreements.data ?? []).filter((a) => a.customerId === customerId && a.status !== 'Cancelled'),
+    [agreements.data, customerId],
   );
+  const customerLpos = useMemo(() => (lpos.data ?? []).filter((l) => l.customerId === customerId), [lpos.data, customerId]);
+  const agreement = customerAgreements.find((a) => a.id === values.hireAgreementId);
+  const lpo = customerLpos.find((l) => l.id === values.lpoId);
 
-  // Gates completion state — 4 conditions
-  const gates = {
-    quoted:      !!quoted,
-    haSent:      !!haSent,
-    haReceived:  !!haReceived,
-    lpoComplete: !!(lpoNumber && lpoValidityDate),
-  };
-  const gatesCount    = Object.values(gates).filter(Boolean).length;
-  const gatesComplete = gatesCount === 4;
+  const totalValue = useMemo(() => computeTotalValue(Number(dailyRate), startDate, endDate), [dailyRate, startDate, endDate]);
 
-  // Available machines filtered by branch
   const availableMachines = useMemo(
-    () => machines?.filter(m => m.status === 'Available' && (!branchId || m.branchId === branchId)) || [],
-    [machines, branchId]
+    () => (machines.data ?? []).filter((m) =>
+      m.id === values.machineId || (!UNBOOKABLE.has(String(m.status)) && (!branchId || m.branchId === branchId))),
+    [machines.data, branchId, values.machineId],
   );
 
-  const onSubmit = async (data: BookingFormData, saveAsReserved = false) => {
-    // Validate the hire agreement reference before touching the store.
-    const validation = hireLink.validateAgreementRef(data.hireAgreementId ?? '');
-    if (!validation.ok) {
-      form.setError('hireAgreementId', { message: validation.message });
-      return;
-    }
-    const linkedAgreementId = validation.agreementId;
+  // HA gates come from the saved agreement (sent / received dates); the LPO gate from the chosen LPO.
+  const haSent = !!agreement?.sentAt;
+  const haReceived = !!agreement?.receivedAt;
+  const gates = { quoted: !!values.quoted, haSent, haReceived, lpoComplete: !!lpo };
+  const gatesCount = Object.values(gates).filter(Boolean).length;
+  const gatesComplete = gatesCount === 4;
+  const fieldErrors = error ? describeApiError(error).fieldErrors : {};
 
-    let record: Booking;
+  const submit = async (data: BookingFormData, hold: boolean) => {
+    setError(null);
+    setSaving(true);
     try {
-      const customer = customers?.find(c => c.id === data.customerId);
-      const machine  = machines?.find(m => m.id === data.machineId);
-      const branch   = branches?.find(b => b.id === data.branchId);
-
-      const bookingData = {
-        ...data,
-        quoted:   data.quoted,
-        haSent:   data.haSent,
-        haReceived: data.haReceived,
-        lpoNumber:  data.lpoNumber,
-        lpoValidityDate: data.lpoValidityDate,
-        reserved: saveAsReserved || data.reserved,
-      };
-
-      const status = computeBookingStatus(bookingData);
-
-      const now = new Date().toISOString();
-      const orgId = useAuthStore.getState().user?.orgId ?? JA_ORG_ID;
-      const newBooking = buildBookingRecord({
-        mode:      isEditing ? 'edit' : 'create',
-        data:      { ...bookingData, hireAgreementId: linkedAgreementId ?? '' },
-        existing:  booking ?? undefined,
-        orgId,
-        now,
-        names: {
-          customerName: customer?.name ?? data.customerId,
-          assetNumber:  machine?.assetNumber ?? data.machineId,
-          machineModel: machine ? `${machine.make} ${machine.model}` : '',
-          branchName:   branch?.name ?? data.branchId,
-        },
-        status,
-        totalValue,
-        idSeed: Date.now(),
-      });
-      record = newBooking;
-
-      if (isEditing && booking) {
-        updateBooking(booking.id, newBooking);
+      const gateValues = { ...data, haSent, haReceived, reserved: hold || data.reserved };
+      const status = planningStatus({ ...gateValues, lpoId: data.lpoId });
+      if (baseline) {
+        const patch = buildBookingUpdate(gateValues, status, baseline);
+        if (Object.keys(patch).length === 0) { onClose(); return; }
+        await update.mutateAsync({ id: baseline.id, rowVersion: baseline.rowVersion ?? 0, patch });
         toastSuccess('Booking updated');
       } else {
-        addBooking(newBooking);
-        toastSuccess(
-          saveAsReserved || !gatesComplete
-            ? 'Booking saved as Reserved — complete gates to dispatch'
-            : 'Booking created — ready to dispatch'
-        );
+        await create.mutateAsync({ body: buildBookingCreate(gateValues, status), submissionId: submission.id() });
+        submission.renew();
+        toastSuccess(status === 'Reserved' ? 'Booking saved as Reserved. Complete the gates to dispatch.' : 'Booking created, ready to dispatch');
       }
-    } catch {
-      toastError('Failed to save booking');
-      return;
+      onClose();
+    } catch (err) {
+      setError(err); // every entered value stays in the form
+    } finally {
+      setSaving(false);
     }
+  };
 
-    // Trigger (a): booking persisted, so raise the On Hire event (never throws).
-    if (record.status === 'On Hire' && record.hireAgreementId) {
-      hireLink.handleOnHire({ source: 'booking', allocationId: record.id });
+  const reload = async () => {
+    if (!baseline) return;
+    setReloading(true);
+    try {
+      setBaseline(await fetchBooking(baseline.id)); // entered values are not touched
+      setError(null);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setReloading(false);
     }
-    form.reset();
-    onClose();
   };
 
   const GateItem = ({ done, label }: { done: boolean; label: string }) => (
@@ -214,359 +175,184 @@ export function BookingFormDialog({ open, onClose, booking, defaultBranchId }: B
     </div>
   );
 
+  const err = form.formState.errors;
+  const fieldMsg = (name: string, local?: string) => {
+    const m = local ?? fieldErrors[name];
+    return m ? <p className="text-xs text-rose-500">{m}</p> : null;
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Booking' : 'Create New Booking'}</DialogTitle>
+          <DialogTitle>{isEditing ? `Edit Booking ${booking?.reference ?? ''}` : 'Create New Booking'}</DialogTitle>
           <DialogDescription>
             {isEditing ? 'Update booking details' : 'Create a new machine rental booking (REF-08)'}
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form className="space-y-4">
-            {/* Row 1 — Customer + Machine */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="customerId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Customer*</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="machineId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Machine* <span className="text-xs text-muted-foreground">(Available in branch)</span></FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {availableMachines.map(m => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.assetNumber} — {m.make} {m.model} ({(m as any).type ?? ''}·{(m as any).energy ?? ''} {(m as any).wh ?? m.workingHeight}m)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
+        <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+          {error != null && <BookingErrorNotice error={error} onReload={() => void reload()} reloading={reloading} />}
 
-            {/* Row 2 — Dates */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="startDate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Start Date*</FormLabel>
-                  <FormControl><Input type="date" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="endDate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>End Date*</FormLabel>
-                  <FormControl><Input type="date" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label htmlFor="bk-customer" className="text-sm font-medium">Customer*</label>
+              <select id="bk-customer" className={selectClass} disabled={isEditing} {...form.register('customerId', {
+                onChange: () => { form.setValue('hireAgreementId', ''); form.setValue('lpoId', ''); },
+              })}>
+                <option value="">Select customer</option>
+                {customers.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {fieldMsg('customerId', err.customerId?.message)}
             </div>
+            <div className="space-y-1">
+              <label htmlFor="bk-machine" className="text-sm font-medium">Machine*</label>
+              <select id="bk-machine" className={selectClass} disabled={onHire} {...form.register('machineId')}>
+                <option value="">Select machine</option>
+                {availableMachines.map((m) => (
+                  <option key={m.id} value={m.id}>{m.assetNumber} — {m.make} {m.model}</option>
+                ))}
+              </select>
+              {fieldMsg('machineId', err.machineId?.message)}
+            </div>
+          </div>
 
-            {/* Row 3 — Period + Time + Rate + Total Value */}
-            <div className="grid grid-cols-4 gap-4">
-              <FormField control={form.control} name="period" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Billing Period*</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {['Daily', 'Weekly', 'Monthly', '2-Day', '1-Day'].map(p => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="time" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Time*</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {['AM', 'PM', 'Specific'].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="dailyRate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Daily Rate (AED)*</FormLabel>
-                  <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              {/* Live Total Value */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Total Value (AED)</label>
-                <div className={`flex h-10 items-center rounded-md border px-3 text-sm font-semibold ${
-                  totalValue > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {totalValue > 0 ? `AED ${totalValue.toLocaleString()}` : '—'}
-                </div>
-                {totalValue > 0 && startDate && endDate && (
-                  <p className="text-[10px] text-muted-foreground">
-                    {Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1} days × AED {dailyRate}
-                  </p>
-                )}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label htmlFor="bk-branch" className="text-sm font-medium">Branch filter</label>
+              <select id="bk-branch" className={selectClass} {...form.register('branchId')}>
+                <option value="">All branches</option>
+                {branches.data?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="bk-start" className="text-sm font-medium">Start Date*</label>
+              <Input id="bk-start" type="date" {...form.register('startDate')} />
+              {fieldMsg('startDate', err.startDate?.message)}
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="bk-end" className="text-sm font-medium">End Date*</label>
+              <Input id="bk-end" type="date" {...form.register('endDate')} />
+              {fieldMsg('endDate', err.endDate?.message)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label htmlFor="bk-rate" className="text-sm font-medium">Daily Rate (AED)*</label>
+              <Input id="bk-rate" type="number" step="0.01" placeholder="0.00" {...form.register('dailyRate')} />
+              {fieldMsg('dailyRate', err.dailyRate?.message)}
+            </div>
+            <div className="space-y-1">
+              <span className="text-sm font-medium">Total Value (AED)</span>
+              <div className={`flex h-9 items-center rounded-md border px-3 text-sm font-semibold ${
+                totalValue > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'bg-muted text-muted-foreground'
+              }`}>
+                {totalValue > 0 ? `AED ${totalValue.toLocaleString()}` : '—'}
               </div>
+              <p className="text-[10px] text-muted-foreground">The server computes the stored total.</p>
             </div>
+          </div>
 
-            {form.watch('time') === 'Specific' && (
-              <FormField control={form.control} name="specificTime" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Specific Time</FormLabel>
-                  <FormControl><Input type="time" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+          <div className="space-y-1">
+            <label htmlFor="bk-address" className="text-sm font-medium">Delivery Address / Site*</label>
+            <Input id="bk-address" placeholder="Full site address" {...form.register('deliveryAddress')} />
+            {fieldMsg('deliveryAddress', err.deliveryAddress?.message)}
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="bk-phone" className="text-sm font-medium">Site Contact Phone*</label>
+            <Input id="bk-phone" placeholder="+971 50 123 4567" {...form.register('siteContactPhone')} />
+            {fieldMsg('contactPhone', err.siteContactPhone?.message)}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label htmlFor="bk-agreement" className="text-sm font-medium">Hire Agreement</label>
+              <select id="bk-agreement" className={selectClass} {...form.register('hireAgreementId')}>
+                <option value="">None</option>
+                {customerAgreements.map((a) => <option key={a.id} value={a.id}>{a.agreementNo}</option>)}
+              </select>
+              {fieldMsg('hireAgreementId')}
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="bk-lpo" className="text-sm font-medium">LPO Number</label>
+              <select id="bk-lpo" className={selectClass} {...form.register('lpoId')}>
+                <option value="">None</option>
+                {customerLpos.map((l) => (
+                  <option key={l.id} value={l.id}>{l.lpoNo}{l.validUntil ? ` (valid until ${l.validUntil})` : ''}</option>
+                ))}
+              </select>
+              {lpo && <p className="text-xs text-muted-foreground">Validity: {lpo.validUntil ?? 'no end date'}</p>}
+              {fieldMsg('lpoId')}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <Checkbox checked={!!values.operatorRequired} onCheckedChange={(c) => form.setValue('operatorRequired', c === true)} />
+            Operator Required
+          </label>
+
+          {/* Dispatch gates */}
+          <Card className={`p-4 border-2 ${gatesComplete ? 'border-emerald-300 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className={`text-sm font-semibold ${gatesComplete ? 'text-emerald-900' : 'text-amber-900'}`}>Legal Dispatch Gates (REF-08)</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Delivery job cannot be created unless all 4 are complete</p>
+              </div>
+              <Badge variant={gatesComplete ? 'default' : 'outline'} className={gatesComplete ? 'bg-emerald-600' : 'text-amber-700 border-amber-300'}>
+                {gatesCount}/4 complete
+              </Badge>
+            </div>
+            <label className="mb-3 flex items-center gap-2 text-sm font-medium cursor-pointer">
+              <Checkbox checked={!!values.quoted} onCheckedChange={(c) => form.setValue('quoted', c === true)} />
+              QT'd (Quoted)
+            </label>
+            {fieldMsg('quoted')}
+            <div className="grid grid-cols-2 gap-2 p-3 rounded-lg bg-white/60">
+              <GateItem done={gates.quoted} label="QT'd — Quoted" />
+              <GateItem done={gates.haSent} label="HA Sent (from the agreement)" />
+              <GateItem done={gates.haReceived} label="HA Received (from the agreement)" />
+              <GateItem done={gates.lpoComplete} label="LPO linked" />
+            </div>
+            {(fieldErrors.haSent || fieldErrors.haReceived) && (
+              <p className="mt-2 text-xs text-rose-500">{fieldErrors.haSent ?? fieldErrors.haReceived}</p>
             )}
-
-            {/* Row 4 — Branch */}
-            <FormField control={form.control} name="branchId" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Branch*</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {branches?.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {/* Row 5 — Delivery Address */}
-            <FormField control={form.control} name="deliveryAddress" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Delivery Address / Site*</FormLabel>
-                <FormControl><Input placeholder="Full site address" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {/* Row 6 — Site Contact */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="siteContactName" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Site Contact Name*</FormLabel>
-                  <FormControl><Input placeholder="Contact person" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="siteContactPhone" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Site Contact Phone*</FormLabel>
-                  <FormControl><Input placeholder="+971 50 123 4567" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-
-            {/* Hire Agreement link */}
-            <FormField control={form.control} name="hireAgreementId" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Hire Agreement</FormLabel>
-                <FormControl>
-                  <Input
-                    list="hire-agreement-options"
-                    placeholder="Hire agreement ID (optional)"
-                    disabled={isDemoBooking}
-                    {...field}
-                    value={field.value ?? ''}
-                  />
-                </FormControl>
-                <datalist id="hire-agreement-options">
-                  {agreementOptions?.map(a => (
-                    <option key={a.id} value={a.id}>{a.label}</option>
-                  ))}
-                </datalist>
-                {isDemoBooking && (
-                  <p className="text-xs text-muted-foreground">Demo bookings cannot be linked</p>
-                )}
-                {linkSummary && (
-                  <p className="text-xs text-muted-foreground">
-                    {linkSummary.agreementNo} · {linkSummary.agreementId}
-                    {linkSummary.quotationNumber ? ` · ${linkSummary.quotationNumber}` : ''}
-                  </p>
-                )}
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {/* Operator Required */}
-            <FormField control={form.control} name="operatorRequired" render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
-                <FormControl>
-                  <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-                <FormLabel className="text-sm font-medium cursor-pointer">Operator Required</FormLabel>
-              </FormItem>
-            )} />
-
-            {/* LEGAL DISPATCH GATES */}
-            <Card className={`p-4 border-2 ${gatesComplete ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20' : 'border-amber-200 bg-amber-50 dark:bg-amber-950/20'}`}>
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className={`text-sm font-semibold ${gatesComplete ? 'text-emerald-900 dark:text-emerald-100' : 'text-amber-900 dark:text-amber-100'}`}>
-                    Legal Dispatch Gates (REF-08)
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Delivery job cannot be created unless all 4 are complete
-                  </p>
-                </div>
-                <Badge variant={gatesComplete ? 'default' : 'outline'} className={gatesComplete ? 'bg-emerald-600' : 'text-amber-700 border-amber-300'}>
-                  {gatesCount}/4 complete
-                </Badge>
+            {!gatesComplete && (
+              <div className="flex items-center gap-1.5 mt-3">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+                <p className="text-xs text-amber-700">
+                  Incomplete gates: the booking is saved as <strong>Reserved</strong> (holds the slot, no dispatch)
+                </p>
               </div>
+            )}
+          </Card>
 
-              {/* 3 Checkboxes */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                <FormField control={form.control} name="quoted" render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    <FormLabel className="text-sm font-medium cursor-pointer">QT'd (Quoted)</FormLabel>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="haSent" render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    <FormLabel className="text-sm font-medium cursor-pointer">HA Sent</FormLabel>
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="haReceived" render={({ field }) => (
-                  <FormItem className="flex items-center gap-2 space-y-0">
-                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                    <FormLabel className="text-sm font-medium cursor-pointer">HA Recd? (Signed)</FormLabel>
-                  </FormItem>
-                )} />
-              </div>
+          <div className="space-y-1">
+            <label htmlFor="bk-remarks" className="text-sm font-medium">Remarks / Notes</label>
+            <Textarea id="bk-remarks" placeholder="Special instructions, notes..." rows={2} {...form.register('remarks')} />
+          </div>
 
-              {/* Live gate checklist */}
-              <div className="grid grid-cols-2 gap-2 p-3 rounded-lg bg-white/60 dark:bg-background/40">
-                <GateItem done={gates.quoted}      label="QT'd — Quoted" />
-                <GateItem done={gates.haSent}      label="HA Sent" />
-                <GateItem done={gates.haReceived}  label="HA Received (Signed)" />
-                <GateItem done={gates.lpoComplete} label="LPO Number + Validity" />
-              </div>
+          <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+            <Checkbox checked={!!values.reserved} onCheckedChange={(c) => form.setValue('reserved', c === true)} />
+            Mark as Reserved (hold slot without dispatching)
+          </label>
+          {fieldMsg('reserved')}
 
-              {!gatesComplete && (
-                <div className="flex items-center gap-1.5 mt-3">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                  <p className="text-xs text-amber-700 dark:text-amber-400">
-                    Incomplete gates — booking will be saved as <strong>Reserved</strong> (holds slot, no dispatch)
-                  </p>
-                </div>
-              )}
-            </Card>
-
-            {/* LPO */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="lpoNumber" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>LPO Number {!gates.lpoComplete && <span className="text-amber-600 text-xs">(required for dispatch)</span>}</FormLabel>
-                  <FormControl><Input placeholder="LPO-123456" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="lpoValidityDate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>LPO Validity Date</FormLabel>
-                  <FormControl><Input type="date" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-
-            {/* Sales + Payment Terms */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="salesRep" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sales Rep</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select rep" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {['BG', 'AD', 'CH', 'AM', 'SM', 'SK', 'TD', 'SH', 'MT'].map(r => (
-                        <SelectItem key={r} value={r}>{r}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="paymentTerms" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Terms</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select terms" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {['30', '45', '60', '90', 'Cash Advance', 'PDC'].map(t => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
-
-            {/* Remarks */}
-            <FormField control={form.control} name="remarks" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Remarks / Notes</FormLabel>
-                <FormControl><Textarea placeholder="Special instructions, notes..." rows={2} {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {/* Mark as Reserved */}
-            <FormField control={form.control} name="reserved" render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
-                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                <FormLabel className="text-sm font-medium cursor-pointer">Mark as Reserved (hold slot without dispatching)</FormLabel>
-              </FormItem>
-            )} />
-
-            {/* Footer — conditional buttons */}
-            <DialogFooter className="gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              {!gatesComplete ? (
-                // Gates incomplete — only Save as Reserved
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={form.handleSubmit((d) => onSubmit(d, true))}
-                >
-                  Save as Reserved
-                </Button>
-              ) : (
-                // Gates complete — Create (dispatch-ready)
-                <Button
-                  type="button"
-                  className="bg-orange-500 hover:bg-orange-600 text-white"
-                  onClick={form.handleSubmit((d) => onSubmit(d, false))}
-                >
-                  {isEditing ? 'Update Booking' : 'Create Booking'}
-                </Button>
-              )}
-            </DialogFooter>
-          </form>
-        </Form>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            {!gatesComplete && !onHire ? (
+              <Button type="button" variant="secondary" disabled={saving} onClick={form.handleSubmit((d) => submit(d, true))}>
+                {saving ? 'Saving...' : 'Save as Reserved'}
+              </Button>
+            ) : (
+              <Button type="button" className="bg-orange-500 hover:bg-orange-600 text-white" disabled={saving}
+                onClick={form.handleSubmit((d) => submit(d, false))}>
+                {saving ? 'Saving...' : isEditing ? 'Update Booking' : 'Create Booking'}
+              </Button>
+            )}
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

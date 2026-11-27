@@ -140,7 +140,7 @@ export function pickNoteToCollect<T extends NoteLite>(
   let bestTime = -Infinity;
   for (const n of notes) {
     if (n.orgId !== orgId || n.machineId !== machineId) continue;
-    if (n.status === 'Collected' || n.status === 'Closed') continue;
+    if (n.status === 'Collected' || n.status === 'Closed' || n.status === 'Cancelled') continue;
     const parsed = Date.parse(n.createdAt);
     const t = Number.isNaN(parsed) ? -Infinity : parsed;
     if (best === undefined || t > bestTime) {
@@ -167,6 +167,8 @@ export function collectionStatusControl(current: CollectionStatus): StatusContro
     case 'Collected':
       return { readOnly: true, options: ['Closed'] };
     case 'Closed':
+    case 'Cancelled':
+    case 'Picked Up':
       return { readOnly: true, options: [] };
     default:
       return { readOnly: false, options: ['Draft', 'Scheduled'] };

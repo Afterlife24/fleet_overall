@@ -38,7 +38,7 @@ function setOrg(orgId: string) {
 
 beforeEach(() => {
   setOrg(ORG);
-  useTaxInvoiceStore.setState({ invoices: [], seededOrgs: [], demoLinkedOrgs: [], sequenceByQuotation: {} });
+  useTaxInvoiceStore.setState({ invoices: [] });
 });
 afterEach(cleanup);
 

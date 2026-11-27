@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { CustomerRecord } from '@/types/customerani';
-import { useCustomerStore } from '@/store/customerStore';
 import {
   findCustomer, nextCustomerRecordId, normalizeCustomerName, planFindOrCreate,
 } from '../customerCore';
@@ -129,24 +128,29 @@ describe('Property 12: Customer find-or-create', () => {
   });
 });
 
-describe('Property 12: Customer find-or-create (customerStore.findOrCreate)', () => {
-  beforeEach(() => useCustomerStore.setState({ customers: [], seedMarkers: {} }));
-
+// The browser customer store is gone (customers are API data); the find-or-create planner it wrapped is still
+// pure and is what the server-side duplicate rule mirrors.
+describe('Property 12: Customer find-or-create (planFindOrCreate)', () => {
   it('reuses variants, never duplicates and never changes the customerId', () => {
     fc.assert(
       fc.property(fc.array(opArb, { minLength: 1, maxLength: 20 }), (ops) => {
-        useCustomerStore.setState({ customers: [], seedMarkers: {} });
+        let list: CustomerRecord[] = [];
+        const findOrCreate = (orgId: string, name: string) => {
+          const plan = planFindOrCreate(list, orgId, name, () => nextCustomerRecordId(list, orgId), '2026-01-01T00:00:00.000Z');
+          if (plan.created) list = [...list, plan.customer];
+          return plan.customer;
+        };
         const firstId = new Map<string, string>();
         for (const op of ops) {
-          const before = useCustomerStore.getState().customers.length;
-          const c = useCustomerStore.getState().findOrCreate(op.orgId, op.name);
+          const before = list.length;
+          const c = findOrCreate(op.orgId, op.name);
           const k = key(op.orgId, op.name);
           const isNew = !firstId.has(k);
           if (isNew) firstId.set(k, c.customerId);
           expect(c.customerId).toBe(firstId.get(k));
-          expect(useCustomerStore.getState().customers.length).toBe(before + (isNew ? 1 : 0));
+          expect(list.length).toBe(before + (isNew ? 1 : 0));
         }
-        expect(useCustomerStore.getState().customers.length).toBe(firstId.size);
+        expect(list.length).toBe(firstId.size);
       }),
       { numRuns: 100 },
     );

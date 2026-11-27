@@ -1,43 +1,32 @@
 // @vitest-environment jsdom
-import { createContext, useContext, type ReactNode } from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/features/fleet/MachineQrPanel', () => ({ MachineQrPanel: () => null }));
 vi.mock('@/services/collectionPdf', () => ({ collectionNotePdf: vi.fn(), downloadBlob: vi.fn() }));
-vi.mock('@/services/signedFiles', () => ({ attachSigned: vi.fn(), getSignedFile: vi.fn() }));
 vi.mock('@/lib/toast-helper', () => ({ toastError: vi.fn(), toastSuccess: vi.fn() }));
 
-// Radix Select does not open in jsdom; use a flat stand-in that lists its options.
-vi.mock('@/components/ui/select', () => {
-  const Ctx = createContext<(v: string) => void>(() => undefined);
-  return {
-    Select: ({ onValueChange, children }: { onValueChange: (v: string) => void; children: ReactNode }) => (
-      <div data-testid="status-select">
-        <button type="button" data-testid="force-collected" onClick={() => onValueChange('Collected')} />
-        <Ctx.Provider value={onValueChange}>{children}</Ctx.Provider>
-      </div>
-    ),
-    SelectTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-    SelectValue: () => null,
-    SelectContent: ({ children }: { children: ReactNode }) => <ul>{children}</ul>,
-    SelectItem: function Item({ value, children }: { value: string; children: ReactNode }) {
-      const on = useContext(Ctx);
-      return (
-        <li role="option" aria-selected={false} onClick={() => on(value)}>
-          {children}
-        </li>
-      );
-    },
-  };
-});
+let notes: unknown[] = [];
+const pickedUp = vi.fn();
+const cancel = vi.fn();
+const update = vi.fn();
+vi.mock('@/hooks/api/useCollectionApi', () => ({
+  useCollectionNotes: () => ({ data: notes, isLoading: false, refetch: vi.fn() }),
+  useOwnerDocuments: () => ({ data: [] }),
+  useUpdateCollectionNote: () => ({ mutate: update, isPending: false }),
+  useMarkPickedUp: () => ({ mutate: pickedUp, isPending: false }),
+  useCancelCollection: () => ({ mutate: cancel, isPending: false }),
+  useAttachSignedCopy: () => ({ mutate: vi.fn(), isPending: false }),
+  useStoreGeneratedPdf: () => ({ mutate: vi.fn(), isPending: false }),
+  activeSignedCopy: () => undefined,
+  docSnapshot: (d: unknown) => d,
+  fetchCollectionNote: vi.fn(),
+  openStoredFile: vi.fn(),
+}));
 
 import { CollectionDetail } from './CollectionDetail';
-import { useCollectionStore } from '@/store/collectionStore';
 import type { CollectionNote, CollectionStatus } from '@/types/collection';
-
-const HINT = 'Collected is set automatically at Gate-In in Gate Operations';
 
 function note(status: CollectionStatus, extra: Partial<CollectionNote> = {}): CollectionNote {
   return {
@@ -55,14 +44,15 @@ function note(status: CollectionStatus, extra: Partial<CollectionNote> = {}): Co
     fleetNo: 'J101',
     serialNumber: 'SN1',
     machineDescription: 'Excavator',
-    bookingRef: '',
+    bookingRef: 'BK-1',
     hireAgreementNo: '',
     quotationNo: '',
     invoiceNo: '',
     site: '',
     missing: [],
     refNotes: [],
-    signedStatus: 'Unsigned',
+    signedStatus: 'Pending',
+    rowVersion: 4,
     createdAt: '2026-11-01T00:00:00.000Z',
     updatedAt: '2026-11-01T00:00:00.000Z',
     ...extra,
@@ -70,7 +60,7 @@ function note(status: CollectionStatus, extra: Partial<CollectionNote> = {}): Co
 }
 
 function renderNote(n: CollectionNote) {
-  useCollectionStore.setState({ notes: [n] });
+  notes = [n];
   return render(
     <MemoryRouter>
       <CollectionDetail noteId={n.id} />
@@ -78,54 +68,65 @@ function renderNote(n: CollectionNote) {
   );
 }
 
-const optionTexts = () => screen.queryAllByRole('option').map((o) => o.textContent);
-
-describe('CollectionDetail status control', () => {
+describe('CollectionDetail actions', () => {
   afterEach(() => cleanup());
   beforeEach(() => {
-    useCollectionStore.setState({ notes: [] });
+    notes = [];
+    pickedUp.mockReset();
+    cancel.mockReset();
+    update.mockReset();
   });
 
-  it.each<CollectionStatus>(['Draft', 'Scheduled'])('%s offers only Draft and Scheduled', (s) => {
-    renderNote(note(s));
-    expect(optionTexts()).toEqual(['Draft', 'Scheduled']);
-    expect(screen.getByText(HINT)).toBeTruthy();
+  it('Draft and Scheduled notes can be picked up and cancelled', () => {
+    for (const s of ['Draft', 'Scheduled'] as const) {
+      const { unmount } = renderNote(note(s));
+      expect(screen.getByRole('button', { name: /Mark Picked Up/ })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /Cancel collection/ })).toBeTruthy();
+      unmount();
+    }
   });
 
-  it('Collected is read-only and offers only Closed', () => {
-    renderNote(note('Collected'));
-    expect(optionTexts()).toEqual(['Closed']);
-    expect(screen.getByTestId('cn-status-badge').textContent).toBe('Collected');
-    expect(screen.getByText(HINT)).toBeTruthy();
+  it('Picked Up sends the row version to the picked-up action (not a gate receipt)', () => {
+    renderNote(note('Scheduled'));
+    fireEvent.click(screen.getByRole('button', { name: /Mark Picked Up/ }));
+    expect(pickedUp.mock.calls[0][0]).toEqual({ id: 'cn-1', rowVersion: 4 });
+    expect(screen.getByText(/Picked Up records the truck pickup only/)).toBeTruthy();
   });
 
-  it('Closed is read-only with no options', () => {
-    renderNote(note('Closed'));
-    expect(optionTexts()).toEqual([]);
-    expect(screen.getByTestId('cn-status-badge').textContent).toBe('Closed');
-    expect(screen.getByText(HINT)).toBeTruthy();
-  });
-
-  it('shows the gate reference and a link to /gate only when the link is present', () => {
-    const { unmount } = renderNote(
-      note('Collected', { collectedByGateId: 'ge-1', collectedByGateRef: 'GP-0421', collectedAt: '2026-11-28T10:20:00.000Z' }),
-    );
-    const row = screen.getByTestId('cn-collected-at-gate');
-    expect(row.textContent).toContain('GP-0421');
-    expect(row.querySelector('a')?.getAttribute('href')).toBe('/gate');
-    unmount();
-
-    renderNote(note('Collected'));
-    expect(screen.queryByTestId('cn-collected-at-gate')).toBeNull();
-  });
-
-  it('Save never writes Collected', () => {
+  it('cancel needs a reason', () => {
     renderNote(note('Draft'));
-    fireEvent.click(screen.getByTestId('force-collected'));
+    fireEvent.click(screen.getByRole('button', { name: /Cancel collection/ }));
+    const confirm = screen.getByRole('button', { name: 'Confirm cancel' }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Reason for cancelling'), { target: { value: 'Customer extended' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm cancel' }));
+    expect(cancel.mock.calls[0][0]).toEqual({ id: 'cn-1', rowVersion: 4, reason: 'Customer extended' });
+  });
+
+  it('a Picked Up note cannot be picked up again but can be cancelled', () => {
+    renderNote(note('Picked Up', { pickedUpAt: '2026-11-02T08:00:00.000Z' }));
+    expect(screen.queryByRole('button', { name: /Mark Picked Up/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Cancel collection/ })).toBeTruthy();
+    expect(screen.getByTestId('cn-status-badge').textContent).toBe('Picked Up');
+  });
+
+  it.each<CollectionStatus>(['Collected', 'Closed', 'Cancelled'])('%s is read-only', (s) => {
+    renderNote(note(s));
+    expect(screen.queryByRole('button', { name: /Mark Picked Up/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Cancel collection/ })).toBeNull();
+    expect((screen.getByLabelText('Remarks') as HTMLTextAreaElement).disabled).toBe(true);
+  });
+
+  it('shows the collected time and a link to /gate for a collected note', () => {
+    renderNote(note('Collected', { collectedAt: '2026-11-28T10:20:00.000Z' }));
+    const row = screen.getByTestId('cn-collected-at-gate');
+    expect(row.querySelector('a')?.getAttribute('href')).toBe('/gate');
+  });
+
+  it('Save sends only the changed fields with the row version', () => {
+    renderNote(note('Draft'));
     fireEvent.change(screen.getByLabelText('Remarks'), { target: { value: 'updated' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    const saved = useCollectionStore.getState().notes[0];
-    expect(saved.status).toBe('Draft');
-    expect(saved.remarks).toBe('updated');
+    expect(update.mock.calls[0][0]).toEqual({ id: 'cn-1', rowVersion: 4, patch: { remarks: 'updated' } });
   });
 });

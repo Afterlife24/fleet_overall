@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { ApiErrorNotice, ApiSessionGate, errorText } from '@/components/common/ApiStatus';
+import { LoadingState } from '@/components/common/EmptyState';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -7,29 +9,52 @@ import { SlideOver } from '@/components/common/SlideOver';
 import { InfoGrid, InfoRow, SectionTitle } from '@/components/common/InfoGrid';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useTransportJobs, useDrivers, useTrucks, useUpdateTransportJob } from '@/hooks/useQueries';
-import { useBranchFilter } from '@/hooks/useBranchFilter';
-import type { TransportJobStatus } from '@/types/transport';
+import {
+  useChangeTransportJobStatus, useDriverViews, useTransportJobViews, useTruckViews, useUpdateTransportJobApi,
+} from '@/hooks/api/useTransportApi';
+import type { TransportJobStatusValue } from '@/services/api/transport';
 import { ref13Rows, transportCounters } from '@/services/transportCore';
 import { cn } from '@/lib/utils';
 import { toastSuccess, toastError } from '@/lib/toast-helper';
 import { TransportJobDialog } from './TransportJobDialog';
 import { Truck, MapPin, Plus, Navigation, ArrowRightLeft } from 'lucide-react';
 
+/** The next statuses a job may move to (the server enforces the same order). */
+const NEXT_STATUS: Record<TransportJobStatusValue, TransportJobStatusValue[]> = {
+  Scheduled: ['Loading', 'Cancelled'],
+  Loading: ['In Transit', 'Cancelled'],
+  'In Transit': ['Delivered', 'Cancelled'],
+  Delivered: ['Returning', 'Cancelled'],
+  Returning: ['Completed', 'Cancelled'],
+  Completed: [],
+  Cancelled: [],
+};
+
 export function TransportPage() {
-  const { data: jobs } = useTransportJobs();
-  const { data: drivers } = useDrivers();
-  const { data: trucks } = useTrucks();
-  const filteredJobs = useBranchFilter(jobs);
-  const filteredDrivers = useBranchFilter(drivers);
-  const filteredTrucks = useBranchFilter(trucks);
+  return (
+    <ApiSessionGate>
+      <TransportBoard />
+    </ApiSessionGate>
+  );
+}
+
+function TransportBoard() {
+  const jobsQuery = useTransportJobViews();
+  const driversQuery = useDriverViews();
+  const trucksQuery = useTruckViews();
+  // The server already limits every list to the branches this user may see.
+  const filteredJobs = jobsQuery.data ?? [];
+  const filteredDrivers = driversQuery.data ?? [];
+  const filteredTrucks = trucksQuery.data ?? [];
+  const drivers = driversQuery.data;
   // Keep the id, not the row, so the panel always shows the stored status and driver.
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = jobs?.find((j) => j.id === selectedId) ?? null;
+  const selected = filteredJobs.find((j) => j.id === selectedId) ?? null;
   const [createJobOpen, setCreateJobOpen] = useState(false);
-  const [reassigningDriver, setReassigningDriver] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-  const updateJob = useUpdateTransportJob();
+  const [actionError, setActionError] = useState<unknown>(null);
+  const updateJob = useUpdateTransportJobApi();
+  const changeStatus = useChangeTransportJobStatus();
+  const busy = updateJob.isPending || changeStatus.isPending;
 
   const counters = transportCounters(filteredJobs);
   const activeJobs = counters.active;
@@ -39,6 +64,34 @@ export function TransportPage() {
 
   const todayDeliveries = counters.deliveries;
   const todayCollections = counters.collections;
+
+  const reload = () => { setActionError(null); jobsQuery.refetch(); };
+  const assignDriver = (driverId: string) => {
+    if (!selected) return;
+    const driver = filteredDrivers.find((d) => d.id === driverId);
+    setActionError(null);
+    updateJob.mutate(
+      { id: selected.id, rowVersion: selected.rowVersion, patch: { driverId } },
+      {
+        onSuccess: () => toastSuccess(`Driver ${driver?.name ?? driverId} assigned`),
+        onError: (err) => { setActionError(err); toastError(errorText(err)); },
+      },
+    );
+  };
+  const setStatus = (status: TransportJobStatusValue) => {
+    if (!selected) return;
+    setActionError(null);
+    changeStatus.mutate(
+      { id: selected.id, rowVersion: selected.rowVersion, status },
+      {
+        onSuccess: () => toastSuccess(`Status updated to ${status}`),
+        onError: (err) => { setActionError(err); toastError(errorText(err)); },
+      },
+    );
+  };
+
+  if (jobsQuery.isLoading) return <LoadingState />;
+  if (jobsQuery.isError) return <ApiErrorNotice error={jobsQuery.error} onRetry={jobsQuery.refetch} />;
 
   return (
     <div className="space-y-5">
@@ -85,7 +138,7 @@ export function TransportPage() {
               return (
                 <button
                   key={job.id}
-                  onClick={() => setSelectedId(job.id)}
+                  onClick={() => { setActionError(null); setSelectedId(job.id); }}
                   className="flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -143,7 +196,7 @@ export function TransportPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground">{truck.registration}</p>
-                <p className="text-xs text-muted-foreground">{truck.type} · {truck.capacity}T</p>
+                <p className="text-xs text-muted-foreground">{truck.type} · {Number(truck.capacityKg).toLocaleString()} kg</p>
               </div>
               <StatusBadge status={truck.status} size="sm" />
             </div>
@@ -154,62 +207,35 @@ export function TransportPage() {
       {/* Job detail */}
       <SlideOver
         open={!!selected}
-        onClose={() => setSelectedId(null)}
+        onClose={() => { setActionError(null); setSelectedId(null); }}
         title={selected ? selected.reference : ''}
         description={selected ? `${selected.assetNumber} · ${selected.machineModel}` : ''}
         width="md"
         footer={
           selected && (
             <div className="space-y-2">
-              {/* Reassign Driver */}
+              {actionError != null && <ApiErrorNotice error={actionError} onReload={reload} />}
               <div className="flex items-center gap-2">
-                <Select
-                  disabled={reassigningDriver}
-                  onValueChange={(driverId) => {
-                    if (!selected) return;
-                    setReassigningDriver(true);
-                    const driver = filteredDrivers?.find(d => d.id === driverId);
-                    updateJob.mutateAsync({
-                      id: selected.id,
-                      data: { driverId, driverName: driver?.name ?? driverId },
-                    })
-                      .then(() => toastSuccess(`Driver ${driver?.name ?? driverId} assigned`))
-                      .catch(() => toastError('Failed to assign driver'))
-                      .finally(() => setReassigningDriver(false));
-                  }}
-                >
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Reassign Driver..." /></SelectTrigger>
+                <Select disabled={busy} value="" onValueChange={assignDriver}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder={selected.driverName ? `Driver: ${selected.driverName} (reassign...)` : 'Assign Driver...'} /></SelectTrigger>
                   <SelectContent>
-                    {filteredDrivers?.map(d => (
+                    {filteredDrivers.map((d) => (
                       <SelectItem key={d.id} value={d.id}>{d.name} · {d.branchName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              {/* Update Status */}
               <div className="flex items-center gap-2">
-                <Select
-                  disabled={updatingStatus}
-                  onValueChange={(newStatus) => {
-                    if (!selected) return;
-                    setUpdatingStatus(true);
-                    updateJob.mutateAsync({ id: selected.id, data: { status: newStatus as TransportJobStatus } })
-                      .then(() => toastSuccess(`Status updated to ${newStatus}`))
-                      .catch(() => toastError('Failed to update status'))
-                      .finally(() => setUpdatingStatus(false));
-                  }}
-                >
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Update Status..." /></SelectTrigger>
+                <Select disabled={busy || NEXT_STATUS[selected.status].length === 0} value="" onValueChange={(v) => setStatus(v as TransportJobStatusValue)}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder={NEXT_STATUS[selected.status].length === 0 ? `Status: ${selected.status}` : 'Update Status...'} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Scheduled">Scheduled</SelectItem>
-                    <SelectItem value="In Transit">In Transit</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    {NEXT_STATUS[selected.status].map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-          )
+            </div>          )
         }
       >
         {selected && (

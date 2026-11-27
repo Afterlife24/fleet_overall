@@ -41,7 +41,7 @@ describe('Property 25: markCollectedForMachine stores the gate link', () => {
             orgId: r.orgId, machineId: r.machineId, status: r.status, createdAt, updatedAt: createdAt,
           } as unknown as CollectionNote;
         });
-        useCollectionStore.setState({ notes, counters: {}, demoSeededOrgs: [ORG, 'org-b'] });
+        useCollectionStore.setState({ notes });
         const hasOpen = notes.some((n) => n.orgId === ORG && n.machineId === MACHINE && isOpen(n));
 
         const res = markCollectedForMachine(ORG, MACHINE, gate);

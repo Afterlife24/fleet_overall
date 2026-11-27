@@ -1,0 +1,739 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Add dependencies and package.json scripts/engines": [
+      {
+        "executionId": "04ae2254-321a-4681-bea1-3ea8a438b730",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795699709194
+      },
+      {
+        "executionId": "04ae2254-321a-4681-bea1-3ea8a438b730",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795700484366
+      }
+    ],
+    "1.2 Create server TypeScript/ESM layout, shared DTO folder, vitest configs and eslint boundary": [
+      {
+        "executionId": "04ae2254-321a-4681-bea1-3ea8a438b730",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795700493681
+      }
+    ],
+    "1.3 Create environment, ignore, Beanstalk and Node version files": [
+      {
+        "executionId": "04ae2254-321a-4681-bea1-3ea8a438b730",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795700503322
+      }
+    ],
+    "1. Tooling and repository layout": [
+      {
+        "executionId": "04ae2254-321a-4681-bea1-3ea8a438b730",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795700503399
+      }
+    ],
+    "2.1 Write the idempotent local DB setup script": [
+      {
+        "executionId": "04ae2254-321a-4681-bea1-3ea8a438b730",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795700513355
+      },
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795709745211
+      },
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795709886719
+      }
+    ],
+    "2.2 Execute the setup against the local PostgreSQL service": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795709957513
+      },
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710128589
+      }
+    ],
+    "2. Local database setup (roles and databases)": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710128663
+      }
+    ],
+    "3.1 Implement `server/src/config.ts`": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710149093
+      },
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710325016
+      }
+    ],
+    "3.2 Write property test for production configuration guard": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710326013
+      }
+    ],
+    "3.3 Write property test for s3 configuration completeness": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710326955
+      }
+    ],
+    "3.4 Write property test for TLS options": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710327987
+      }
+    ],
+    "3.5 Write unit tests for configuration and production rejection": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710328973
+      }
+    ],
+    "3. Config_Loader and production guards": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710329067
+      }
+    ],
+    "4.1 Implement errors, logger and correlation id": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795710329685
+      },
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712026701
+      }
+    ],
+    "4.2 Implement the Express app, DB pool, health, fallbacks, limits and shutdown": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712028210
+      }
+    ],
+    "4. App foundation": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712028369
+      }
+    ],
+    "4.3 Write property test for error body mapping": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712028740
+      }
+    ],
+    "4.4 Write property test for validation error mapping": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712030235
+      }
+    ],
+    "4.5 Write property test for body size limit": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712030932
+      }
+    ],
+    "4.6 Write unit tests for the app foundation": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712032333
+      }
+    ],
+    "5.1 Implement `server/scripts/migrate.ts` and its library": [
+      {
+        "executionId": "e3b372b8-9917-45de-9ab7-9b42c989c19b",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712032703
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712129060
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712469638
+      }
+    ],
+    "5.2 Write property test for checksum mismatch detection": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712470375
+      }
+    ],
+    "5.3 Write property test for the target database name guard": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712471382
+      }
+    ],
+    "5.4 Write integration tests for the runner using a temporary migrations directory": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712472362
+      }
+    ],
+    "5. Migration runner": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712472574
+      }
+    ],
+    "6.1 Write migrations 0001 and 0002": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795712473086
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713467717
+      }
+    ],
+    "6.6 Write integration test: migrate from empty and verify all 37 tables": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713462808
+      }
+    ],
+    "6.4 Write migrations 0008 and 0009": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713463668
+      }
+    ],
+    "6.8 Write integration tests for RLS with the runtime role": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713464687
+      }
+    ],
+    "6.2 Write migrations 0003 and 0004": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713465718
+      }
+    ],
+    "6.5 Write migration 0010 (RLS, grants, identity resolver)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713466680
+      }
+    ],
+    "6.3 Write migrations 0005, 0006 and 0007": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713468736
+      }
+    ],
+    "6.7 Write integration tests for database constraints": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713469138
+      }
+    ],
+    "6. Schema migrations, constraints, RLS and identity resolver": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713469248
+      }
+    ],
+    "7.1 Implement `server/src/db/tx.ts`": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713479310
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713812214
+      }
+    ],
+    "7.6 Write integration test for concurrent numbering (T19)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713806293
+      }
+    ],
+    "8.1 Implement principal and permission allowlist": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713807418
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795714427187
+      }
+    ],
+    "7.5 Implement `server/src/modules/shared/audit.ts`": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713808216
+      }
+    ],
+    "7.4 Implement `server/src/modules/shared/rowVersion.ts`": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713809352
+      }
+    ],
+    "7.2 Implement `server/src/modules/shared/numberAllocator.ts`": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713810253
+      }
+    ],
+    "7.7 Write integration tests for idempotency and optimistic concurrency": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713811264
+      }
+    ],
+    "7.3 Implement `server/src/modules/shared/idempotency.ts` and middleware": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713812956
+      }
+    ],
+    "7. Transaction helper, idempotency, row version, numbering, audit": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795713813097
+      }
+    ],
+    "8.7 Write integration tests for authentication flow": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795714426183
+      }
+    ],
+    "8.2 Implement the OIDC adapter and auth middleware": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795714428262
+      }
+    ],
+    "8.3 Implement dev fixture auth and session endpoint": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795714429184
+      }
+    ],
+    "8. Authentication and principal": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795714429369
+      }
+    ],
+    "9.1 Implement storage interface, key rules, upload validator and verification stub": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795714429858
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715180592
+      }
+    ],
+    "9.2 Implement the local storage adapter": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715181539
+      }
+    ],
+    "10.1 Implement company profile with gating rules": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715182534
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716262077
+      }
+    ],
+    "9.10 Write integration tests for local and S3-mock storage": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715183536
+      }
+    ],
+    "9.4 Implement the files API and scan-status gate": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715184624
+      }
+    ],
+    "9.3 Implement the S3 adapter with an injected client": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715185295
+      }
+    ],
+    "9. File storage and files API": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795715185518
+      }
+    ],
+    "10.4 Implement organization apps and custom field definitions": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716260170
+      }
+    ],
+    "10.3 Implement roles and users": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716261087
+      }
+    ],
+    "10.2 Implement branches": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716263076
+      }
+    ],
+    "10.5 Register company-area routers": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716264065
+      }
+    ],
+    "10.9 Write integration tests for company-area APIs": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716265093
+      }
+    ],
+    "10. Company, branches, roles, users, apps and custom fields": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716265282
+      }
+    ],
+    "11.1 Implement the customers module": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795716265447
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717230297
+      }
+    ],
+    "12.3 Register machine routers": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717231518
+      }
+    ],
+    "12.1 Implement machine models and machines": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717232232
+      }
+    ],
+    "12.2 Implement machine documents": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717233261
+      }
+    ],
+    "11.5 Write integration tests for customers including cross-tenant (T18)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717234730
+      }
+    ],
+    "11.2 Register the customers router": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717235296
+      }
+    ],
+    "11. Customers API": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717235633
+      }
+    ],
+    "12.6 Write integration tests for machines including cross-tenant (T18)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717236740
+      }
+    ],
+    "12. Machine models, machines and machine documents API": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717236977
+      }
+    ],
+    "13.1 Implement the pure transition function": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795717237374
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718790896
+      }
+    ],
+    "13.5 Write integration test for the transition table through the API (T01)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718791606
+      }
+    ],
+    "14.3 Register hire agreement and LPO routers": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718792613
+      }
+    ],
+    "13.10 Write integration tests for quotations including cross-tenant (T18)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718793600
+      }
+    ],
+    "13.3 Update frontend CRM rules and their tests": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718795147
+      }
+    ],
+    "14.1 Implement the hire agreements module": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718795599
+      }
+    ],
+    "14.2 Implement the customer LPOs module": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718797099
+      }
+    ],
+    "15.1 Implement `server/scripts/seedDev.ts`": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718798093
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795719324469
+      }
+    ],
+    "14.8 Write integration tests for agreements and LPOs including cross-tenant (T18)": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718799616
+      }
+    ],
+    "14. Hire agreements and customer LPOs API": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718799705
+      }
+    ],
+    "13.2 Implement the quotations module": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718800647
+      }
+    ],
+    "13.4 Register the quotations router": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718801603
+      }
+    ],
+    "13.9 Write integration test for phase-change atomicity": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718802178
+      }
+    ],
+    "13. Quotations and phase history API": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795718802274
+      }
+    ],
+    "15.2 Write integration test for the seed command": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795719323555
+      }
+    ],
+    "15. Development seed command": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795719324767
+      }
+    ],
+    "16. Checkpoint - Backend complete": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795719325976
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795719597267
+      }
+    ],
+    "17.1 Implement the http client, error mapping and idempotency keys": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795719597984
+      },
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795720679138
+      }
+    ],
+    "17.3 Implement resource API modules and query keys": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795720675702
+      }
+    ],
+    "17.2 Implement the frontend auth adapter": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795720677132
+      }
+    ],
+    "17.4 Configure the Vite proxy and cache reset": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795720677675
+      }
+    ],
+    "17. Frontend API client": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795720679331
+      }
+    ],
+    "18.1 Switch the Customers screens": [
+      {
+        "executionId": "a31e4e94-391a-4a3c-90c8-3c1f8227fcaa",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795720679655
+      }
+    ]
+  }
+}

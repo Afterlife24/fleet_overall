@@ -39,7 +39,7 @@ export const seedQuotations: Quotation[] = [
   make(5, 'ABC Company - Boom Lift Hire', 'HA-2026-00005', 'ABC Company', 'abcgroups@gmail.com', 8000, ['Awaiting', 'Tender', 'Won']),
   make(6, 'Damac Properties - Telehandler Hire', 'HA-2026-00008', 'Damac Properties', undefined, 54800, ['Awaiting', 'Tender', 'Lost'], 'Competitor chosen'),
   make(7, 'Arabtec - Scissor Lift Hire', 'HA-2026-00009', 'Arabtec Contracting', undefined, 22400, ['Awaiting', 'Lost'], 'Price too high'),
-  // Quotations of the demo hire agreements (HA-2026-003 to 005), see demoHireLink.ts
+  // Quotations of the demo hire agreements (HA-2026-003 to 005)
   make(8, 'GHI Company - Articulating Boom Lift', 'HA-2026-00010', 'GHI Company PJSC', 'ghi@example.com', 14200, ['Awaiting']),
   make(9, 'JKL Company - Rough Terrain Scissor Lift', 'HA-2026-00011', 'JKL Company LLC', 'jkl@example.com', 16800, ['Awaiting', 'Tender', 'Lost'], 'Project cancelled'),
   make(10, 'MNO Company - Telescopic Boom Lift', 'HA-2026-00012', 'MNO Company LLC', 'mno@example.com', 27300, ['Awaiting', 'Tender', 'Won']),

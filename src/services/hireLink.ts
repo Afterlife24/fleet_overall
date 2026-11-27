@@ -7,7 +7,6 @@ import { useBookingStore } from '@/store/bookingStore';
 import { useHireAgreementStore } from '@/store/hireAgreementStore';
 import { useCrmStore } from '@/store/crmStore';
 import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/toast-helper';
-import { ensureHireLinkDemo } from './demoSeed';
 import type { HireAgreement } from '@/types/hireagreement';
 import type { QuotationPhase } from '@/types/quotation';
 import {
@@ -96,9 +95,8 @@ function activeOrgId(): string {
 }
 
 function buildSnapshot(orgId: string): Snapshot {
-  ensureHireLinkDemo(orgId);
+  // Bookings, agreements and quotations are in-memory mirrors of the API; nothing is seeded here.
   const org = useOrgStore.getState();
-  useHireAgreementStore.getState().ensureSeeded(orgId);
   return {
     orgId,
     today: toLocalISODate(new Date()),

@@ -30,7 +30,7 @@ const rowsArb = fc.array(
 
 function load(rows: { orgId: string; machineId: string; status: CollectionNote['status']; day: number }[]) {
   const notes = rows.map((r, i) => makeNote(i, r.orgId, r.machineId, r.status, r.day));
-  useCollectionStore.setState({ notes, counters: {}, demoSeededOrgs: [ORG, 'org-b'] });
+  useCollectionStore.setState({ notes });
   return notes;
 }
 
