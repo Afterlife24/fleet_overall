@@ -1,30 +1,48 @@
 // Service abstraction layer.
 //
 // Each function in here returns a Promise that resolves to mock data.
-// In Phase 2, replace the body of each function with a `fetch()` call —
+// In Phase 2, replace the body of each function with a `fetch()` call Ã¢â‚¬â€
 // the signatures stay the same, so no page component needs to change.
 
 import {
-  branches, customers, machines, bookings, workshopJobs, technicians, workshopBays,
-  drivers, trucks, transportJobs, inspections, breakdowns, jobCards, users, notifications,
-  gateEntries, crossHires,
-  getBranchById, getCustomerById, getMachineById, getBookingById, getWorkshopJobById,
-  getTechnicianById, getDriverById, getTruckById, getTransportJobById, getInspectionById,
-  getBreakdownById, getJobCardById, getUserById, getInspectionsByType, getCrossHireById,
+  branches, workshopJobs, inspections, breakdowns, users,
+  crossHires,
 } from './mock';
 import { CrossHire } from '@/types/crosshire';
 import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
+import { useBookingStore } from '@/store/bookingStore';
 import {
-  machinesForOrg, crossHiresForOrg, bookingsForOrg, workshopJobsForOrg,
-  transportJobsForOrg, inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
-  gateEntriesForOrg, customersForOrg, branchesForOrg,
-  techniciansForOrg, workshopBaysForOrg, driversForOrg, trucksForOrg,
+  crossHiresForOrg, workshopJobsForOrg,
+  inspectionsForOrg, breakdownsForOrg, jobCardsForOrg,
+  branchesForOrg,
+  techniciansForOrg, workshopBaysForOrg,
   usersForOrg, notificationsForOrg,
 } from './mock/orgData';
+import { listAll, loadCustomerRecords, loadCustomers, loadMachine, loadMachines } from './api/readAdapters';
+import { transportJobsApi } from './api/transport';
+import { kindOfType } from './transportCore';
+import type { TransportTypeCode } from '@/types/transport';
+import { useHireAgreementStore } from '@/store/hireAgreementStore';
 
 // Current tenant from the auth session (demo: read straight from the store).
 function currentOrgId(): string {
   return useAuthStore.getState().user?.orgId ?? JA_ORG_ID;
+}
+
+/** Bookings of the company, from the in-memory mirror that useRetainedMirrorSync fills from the API. */
+function mirroredBookings(orgId: string) {
+  return useBookingStore.getState().userBookings.filter((b) => (b.orgId ?? JA_ORG_ID) === orgId);
+}
+
+/** The transport job fields the dashboard and reports aggregate, read from /api/v1/transport-jobs. */
+async function loadTransportJobs() {
+  const dtos = await listAll((page, pageSize) => transportJobsApi.list({ page, pageSize }));
+  return dtos.map((d) => ({
+    type: kindOfType(d.typeCode as TransportTypeCode),
+    status: d.status,
+    branchId: d.branchId,
+    distance: d.distanceKm === null || d.distanceKm === '' || Number.isNaN(Number(d.distanceKm)) ? undefined : Number(d.distanceKm),
+  }));
 }
 
 // Simulate network latency
@@ -65,88 +83,16 @@ export const branchService = {
   },
 };
 
+/** Customers of the company, read from `/api/v1/customers` and mapped to the shape retained screens use. */
 export const customerService = {
-  list: () => delay(customersForOrg(currentOrgId())),
-  get: (id: string) => delay(customersForOrg(currentOrgId()).find((c: any) => c.id === id)),
+  list: () => loadCustomers(),
+  get: async (id: string) => (await loadCustomers()).find((c) => c.id === id),
 };
 
+/** Machines of the company with their model and branch names, read from `/api/v1/machines`. */
 export const machineService = {
-  list: () => {
-    const list = machinesForOrg(currentOrgId());
-    return delay(list);
-  },
-  get: (id: string) => delay(machinesForOrg(currentOrgId()).find((m) => m.id === id)),
-  create: (data: Partial<typeof machines[0]>) => {
-    const list = machinesForOrg(currentOrgId());
-    const newMachine = {
-      ...data,
-      id: `m-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    } as typeof machines[0];
-    list.push(newMachine);
-    return delay(newMachine);
-  },
-  update: (id: string, data: Partial<typeof machines[0]>) => {
-    const list = machinesForOrg(currentOrgId());
-    const index = list.findIndex((m) => m.id === id);
-    if (index === -1) throw new Error('Machine not found');
-    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  updateStatus: (id: string, status: string) => {
-    const list = machinesForOrg(currentOrgId());
-    const index = list.findIndex((m) => m.id === id);
-    if (index === -1) throw new Error('Machine not found');
-    list[index] = { ...list[index], status: status as any, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  delete: (id: string) => {
-    const list = machinesForOrg(currentOrgId());
-    const index = list.findIndex((m) => m.id === id);
-    if (index === -1) throw new Error('Machine not found');
-    list.splice(index, 1);
-    return delay({ success: true });
-  },
-};
-
-export const bookingService = {
-  list: () => delay(bookingsForOrg(currentOrgId())),
-  get: (id: string) => delay(bookingsForOrg(currentOrgId()).find((b) => b.id === id)),
-  forMachine: (machineId: string) => delay(bookingsForOrg(currentOrgId()).filter((b) => b.machineId === machineId)),
-  create: (data: Partial<typeof bookings[0]>) => {
-    const list = bookingsForOrg(currentOrgId());
-    const newBooking = {
-      ...data,
-      id: `bk-${Date.now()}`,
-      reference: `BK${Date.now().toString().slice(-6)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    } as typeof bookings[0];
-    list.push(newBooking);
-    return delay(newBooking);
-  },
-  update: (id: string, data: Partial<typeof bookings[0]>) => {
-    const list = bookingsForOrg(currentOrgId());
-    const index = list.findIndex((b) => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  updateStatus: (id: string, status: string) => {
-    const list = bookingsForOrg(currentOrgId());
-    const index = list.findIndex((b) => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    list[index] = { ...list[index], status: status as any, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  delete: (id: string) => {
-    const list = bookingsForOrg(currentOrgId());
-    const index = list.findIndex((b) => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    list.splice(index, 1);
-    return delay({ success: true });
-  },
+  list: () => loadMachines(),
+  get: (id: string) => loadMachine(id),
 };
 
 export const workshopService = {
@@ -187,42 +133,6 @@ export const workshopService = {
     const index = list.findIndex((j) => j.id === jobId);
     if (index === -1) throw new Error('Workshop job not found');
     list[index] = { ...list[index], technicianId, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-};
-
-export const transportService = {
-  listJobs: () => delay(transportJobsForOrg(currentOrgId())),
-  getJob: (id: string) => delay(transportJobsForOrg(currentOrgId()).find((t) => t.id === id)),
-  listDrivers: () => delay(driversForOrg(currentOrgId())),
-  getDriver: (id: string) => delay(driversForOrg(currentOrgId()).find((d: any) => d.id === id)),
-  listTrucks: () => delay(trucksForOrg(currentOrgId())),
-  getTruck: (id: string) => delay(trucksForOrg(currentOrgId()).find((t: any) => t.id === id)),
-  create: (data: any) => {
-    const list = transportJobsForOrg(currentOrgId());
-    const newJob = {
-      id: `tj-${Date.now()}`,
-      reference: `TJ-${String(list.length + 1).padStart(4, '0')}`,
-      ...data,
-      status: 'Scheduled',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    list.push(newJob as any);
-    return delay(newJob);
-  },
-  update: (id: string, data: any) => {
-    const list = transportJobsForOrg(currentOrgId());
-    const index = list.findIndex((t) => t.id === id);
-    if (index === -1) throw new Error('Transport job not found');
-    list[index] = { ...list[index], ...data, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  updateStatus: (id: string, status: string) => {
-    const list = transportJobsForOrg(currentOrgId());
-    const index = list.findIndex((t) => t.id === id);
-    if (index === -1) throw new Error('Transport job not found');
-    list[index] = { ...list[index], status: status as any, updatedAt: new Date().toISOString() };
     return delay(list[index]);
   },
 };
@@ -418,38 +328,7 @@ export const notificationService = {
   list: () => delay(notificationsForOrg(currentOrgId())),
 };
 
-export const gateService = {
-  list: () => delay(gateEntriesForOrg(currentOrgId())),
-  create: (data: any) => {
-    const list = gateEntriesForOrg(currentOrgId());
-    const newEntry = {
-      id: `ge-${Date.now()}`,
-      reference: `GP-${String(list.length + 1).padStart(4, '0')}`,
-      ...data,
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    list.push(newEntry as any);
-    return delay(newEntry);
-  },
-  approve: (id: string) => {
-    const list = gateEntriesForOrg(currentOrgId());
-    const index = list.findIndex((g: any) => g.id === id);
-    if (index === -1) throw new Error('Gate entry not found');
-    list[index] = { ...list[index], status: 'Approved' as any, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-  complete: (id: string) => {
-    const list = gateEntriesForOrg(currentOrgId());
-    const index = list.findIndex((g: any) => g.id === id);
-    if (index === -1) throw new Error('Gate entry not found');
-    list[index] = { ...list[index], status: 'Completed' as any, updatedAt: new Date().toISOString() };
-    return delay(list[index]);
-  },
-};
-
-// ── Cross Hire (sub-hire / re-hire) ─────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Cross Hire (sub-hire / re-hire) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Normalise a per-period rate to a monthly equivalent so Day/Week/Month deals
 // can be summed into one comparable revenue figure (~30d month, ~4.33 wk/mo).
@@ -550,7 +429,7 @@ export const crossHireService = {
   },
 };
 
-// ── App onboarding (preset seeding) ─────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ App onboarding (preset seeding) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 //
 // Applies a "choose your setup" preset by creating its declarative records
 // through the normal create services (so the data lands in the current org,
@@ -559,10 +438,18 @@ export const crossHireService = {
 
 import { presetsForApp, type AppPreset } from '@/constants/appPresets';
 
-// Which collections each app "owns" — used when clearing an app's data on a
+// Ã¢â€â‚¬Ã¢â€â‚¬ Customer ANI service Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+
+// Customer records in the shape the retained invoice screen reads. The API is the authority; writes happen
+// through the Customers screen (`customersApi`).
+export const customerANIService = {
+  list: () => loadCustomerRecords(currentOrgId()),
+  get: async (id: string) => (await loadCustomerRecords(currentOrgId())).find((c) => c.id === id),
+};
+
+// Which collections each app "owns" Ã¢â‚¬â€ used when clearing an app's data on a
 // "start fresh" reactivation. Backend: this maps to deleting the app's rows.
-const APP_COLLECTIONS: Record<string, Array<'machines' | 'crossHires' | 'branches'>> = {
-  fleet: ['machines'],
+const APP_COLLECTIONS: Record<string, Array<'crossHires' | 'branches'>> = {
   cross_hire: ['crossHires'],
   branches: ['branches'],
 };
@@ -574,10 +461,6 @@ export const onboardingService = {
     if (preset.blank || !preset.records) return delay({ success: true, created: 0 });
 
     let created = 0;
-    for (const m of preset.records.machines ?? []) {
-      await machineService.create(m as any);
-      created++;
-    }
     for (const c of preset.records.crossHires ?? []) {
       await crossHireService.create(c as any);
       created++;
@@ -595,7 +478,6 @@ export const onboardingService = {
     const cols = APP_COLLECTIONS[appId] ?? [];
     const org = currentOrgId();
     let n = 0;
-    if (cols.includes('machines')) n += machinesForOrg(org).length;
     if (cols.includes('crossHires')) n += crossHiresForOrg(org).length;
     if (cols.includes('branches')) n += branchesForOrg(org).length;
     return n;
@@ -605,20 +487,19 @@ export const onboardingService = {
   async clearAppData(appId: string) {
     const cols = APP_COLLECTIONS[appId] ?? [];
     const org = currentOrgId();
-    if (cols.includes('machines')) machinesForOrg(org).splice(0);
     if (cols.includes('crossHires')) crossHiresForOrg(org).splice(0);
     if (cols.includes('branches')) branchesForOrg(org).splice(0);
     return delay({ success: true });
   },
 };
 
-// ── Six Sigma metrics ──────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Six Sigma metrics Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export const sixSigmaService = {
   async getMetrics(branchId?: string) {
     const ids = branchScopeIds(branchId);
     const org = currentOrgId();
-    const machines = machinesForOrg(org);
+    const machines = await loadMachines();
     const scopedMachines = machines.filter((m) => inScope(m.branchId, ids));
     const scopedBreakdowns = breakdownsForOrg(org).filter((b) => inScope((b as any).branchId, ids));
     const scopedWorkshopJobs = workshopJobsForOrg(org).filter((j) => inScope((j as any).branchId, ids));
@@ -632,10 +513,10 @@ export const sixSigmaService = {
   },
 };
 
-// ── Dashboard aggregates ──────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Dashboard aggregates Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 // Resolve which branch IDs a dashboard scope covers.
-// 'all' → every branch; 'uae' → all UAE branches (excl. KSA); otherwise the single branch.
+// 'all' Ã¢â€ â€™ every branch; 'uae' Ã¢â€ â€™ all UAE branches (excl. KSA); otherwise the single branch.
 function branchScopeIds(branchId?: string): string[] | null {
   if (!branchId || branchId === 'all') return null; // null = no filtering
   if (branchId === 'uae') return branches.filter((b) => b.country === 'UAE').map((b) => b.id);
@@ -651,9 +532,9 @@ export const dashboardService = {
   async getKPIs(branchId?: string) {
     const ids = branchScopeIds(branchId);
     const org = currentOrgId();
-    const machines = machinesForOrg(org);
+    const machines = await loadMachines();
     const scopedMachines = machines.filter((m) => inScope(m.branchId, ids));
-    const scopedTransport = transportJobsForOrg(org).filter((j) => inScope((j as any).branchId, ids));
+    const scopedTransport = (await loadTransportJobs()).filter((j) => inScope(j.branchId, ids));
     const scopedBreakdowns = breakdownsForOrg(org).filter((b) => inScope((b as any).branchId, ids));
     const scopedBays = workshopBaysForOrg(org).filter((b) => inScope((b as any).branchId, ids));
     const scopedWsJobs = workshopJobsForOrg(org).filter((j) => inScope((j as any).branchId, ids));
@@ -691,7 +572,7 @@ export const dashboardService = {
 
   async getFleetByCategory(branchId?: string) {
     const ids = branchScopeIds(branchId);
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     const counts = machines.filter((m) => inScope(m.branchId, ids)).reduce((acc, m) => {
       acc[m.category] = (acc[m.category] || 0) + 1;
       return acc;
@@ -701,7 +582,7 @@ export const dashboardService = {
 
   async getFleetByStatus(branchId?: string) {
     const ids = branchScopeIds(branchId);
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     const counts = machines.filter((m) => inScope(m.branchId, ids)).reduce((acc, m) => {
       acc[m.status] = (acc[m.status] || 0) + 1;
       return acc;
@@ -712,7 +593,7 @@ export const dashboardService = {
   async getBranchUtilization(branchId?: string) {
     const ids = branchScopeIds(branchId);
     const orgBranches = branchesForOrg(currentOrgId());
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     // Show only the branches within scope (all when unfiltered)
     const scopedBranches = ids ? orgBranches.filter((b) => ids.includes(b.id)) : orgBranches;
     return delay(scopedBranches.map((b) => {
@@ -736,9 +617,9 @@ export const dashboardService = {
 
   async getRecentActivity(branchId?: string) {
     const ids = branchScopeIds(branchId);
-    const machines = machinesForOrg(currentOrgId());
+    const machines = await loadMachines();
     const allTimeline = machines.filter((m) => inScope(m.branchId, ids)).flatMap((m) =>
-      m.timeline.map((t) => ({ ...t, machineAsset: m.assetNumber, machineModel: `${m.make} ${m.model}` }))
+      (m.timeline ?? []).map((t) => ({ ...t, machineAsset: m.assetNumber, machineModel: `${m.make} ${m.model}` }))
     );
     const breakdownTimeline = breakdownsForOrg(currentOrgId()).filter((b) => inScope((b as any).branchId, ids)).flatMap((b) =>
       b.timeline.map((t) => ({ ...t, machineAsset: b.assetNumber, machineModel: b.machineModel }))
@@ -749,12 +630,12 @@ export const dashboardService = {
   },
 };
 
-// ── Report aggregates ───────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Report aggregates Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
+async function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
   const org = currentOrgId();
-  const machines = machinesForOrg(org);
-  const bookings = bookingsForOrg(org);
+  const machines = await loadMachines();
+  const bookings = mirroredBookings(org);
   const breakdowns = breakdownsForOrg(org);
   const workshopJobs = workshopJobsForOrg(org);
   const multiplier = period === 'daily' ? 1 : period === 'weekly' ? 7 : 30;
@@ -775,9 +656,9 @@ function computeSummary(period: 'daily' | 'weekly' | 'monthly') {
 }
 
 export const reportService = {
-  async getDailySummary() { return delay(computeSummary('daily')); },
-  async getWeeklySummary() { return delay(computeSummary('weekly')); },
-  async getMonthlySummary() { return delay(computeSummary('monthly')); },
+  async getDailySummary() { return delay(await computeSummary('daily')); },
+  async getWeeklySummary() { return delay(await computeSummary('weekly')); },
+  async getMonthlySummary() { return delay(await computeSummary('monthly')); },
 
   async getRevenueTrend(period: 'daily' | 'weekly' | 'monthly') {
     const labels = period === 'daily'
@@ -798,8 +679,8 @@ export const reportService = {
 
   async getBranchPerformance() {
     const org = currentOrgId();
-    const machines = machinesForOrg(org);
-    const bookings = bookingsForOrg(org);
+    const machines = await loadMachines();
+    const bookings = mirroredBookings(org);
     const breakdowns = breakdownsForOrg(org);
     return delay(branchesForOrg(org).map((b) => {
       const branchMachines = machines.filter((m) => m.branchId === b.id);
@@ -833,7 +714,7 @@ export const reportService = {
   },
 
   async getTransportReport() {
-    const transportJobs = transportJobsForOrg(currentOrgId());
+    const transportJobs = await loadTransportJobs();
     const statusCounts = transportJobs.reduce((acc, j) => {
       acc[j.status] = (acc[j.status] || 0) + 1;
       return acc;
@@ -842,7 +723,7 @@ export const reportService = {
     return delay({
       byStatus: Object.entries(statusCounts).map(([label, value]) => ({ label, value })),
       dailyTrips: days.map((d, i) => ({ label: d, deliveries: [3, 5, 4, 6, 5, 2, 1][i], collections: [2, 3, 4, 2, 3, 1, 1][i] })),
-      totalDistance: Math.round(transportJobs.reduce((s, j) => s + j.distance, 0)),
+      totalDistance: Math.round(transportJobs.reduce((s, j) => s + (j.distance ?? 0), 0)),
       completedToday: transportJobs.filter((j) => j.status === 'Completed' || j.status === 'Delivered').length,
     });
   },
@@ -861,4 +742,13 @@ export const reportService = {
       openCases: breakdowns.filter((b) => b.status === 'Open' || b.status === 'In Progress').length,
     });
   },
+};
+
+// -- Hire Agreement service --------------------------------------------------
+
+// Agreements in the shape the retained invoice screen reads. The API is the authority: the in-memory copy read
+// here is filled from `hireAgreementsApi` by `useRetainedMirrorSync`; writes happen through the Hire Agreement screen.
+export const hireAgreementService = {
+  list: () => delay(useHireAgreementStore.getState().forOrg(currentOrgId())),
+  get: (id: string) => delay(useHireAgreementStore.getState().forOrg(currentOrgId()).find((h) => h.id === id)),
 };

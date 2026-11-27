@@ -1,0 +1,514 @@
+{
+  "pbtResults": {
+    "1.6 Write property test for the invoice number round trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1795102601326
+    },
+    "1.7 Write property test for totals and VAT": {
+      "status": "passed",
+      "lastRunTimestamp": 1795102628599
+    }
+  },
+  "executionHistory": {
+    "1.1 Extend the `TaxInvoice` type": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332236
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332348
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102431959
+      }
+    ],
+    "1.2 Create `src/services/invoiceRulesCore.ts`: dates, selection, numbering, totals": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332425
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102432796
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102534848
+      }
+    ],
+    "1.3 Add request validation, draft building, update and removal rules to `invoiceRulesCore.ts`": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332529
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102535559
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102669671
+      }
+    ],
+    "2.1 Create `src/store/taxInvoiceStore.ts`": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332642
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102537060
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102665181
+      }
+    ],
+    "3.1 Add the sample linked invoice to the demo seed": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332740
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102680604
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102886564
+      }
+    ],
+    "4.1 Create `src/services/quotationInvoicing.ts`": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332795
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103071666
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103198141
+      }
+    ],
+    "4.2 Switch `taxInvoiceService` to the facade and remove the in-memory dataset": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332852
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103202847
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103441442
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332907
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795107586456
+      }
+    ],
+    "6.1 Extend the invoicing prefill": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102332963
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103199369
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103439801
+      }
+    ],
+    "6.2 List linked invoices in the quotation detail": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102333030
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103200858
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103440523
+      }
+    ],
+    "7.1 Add the \"create from quotation\" flow to `InvoicePage.tsx`": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102333167
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103445455
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103698982
+      }
+    ],
+    "7.2 Update the invoice list": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102333231
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103700369
+      }
+    ],
+    "8. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102333291
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795107588469
+      }
+    ],
+    "9.1 Run the full verification": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102333347
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795107588711
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795108351412
+      }
+    ],
+    "1.6 Write property test for the invoice number round trip": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102537568
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102668139
+      }
+    ],
+    "1.7 Write property test for totals and VAT": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102539092
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102666136
+      }
+    ],
+    "1.5 Write property test for agreement resolution": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102539360
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102667141
+      }
+    ],
+    "2. Persisted invoice store": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102665250
+      }
+    ],
+    "1. Domain types and pure invoice rules": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102669771
+      }
+    ],
+    "1.8 Write property test for rule messages": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102680531
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102882385
+      }
+    ],
+    "1.9 Write property test for billing period derivation": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102681255
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102883065
+      }
+    ],
+    "1.10 Write property test for Off-Hire": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102682266
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102885080
+      }
+    ],
+    "2.2 Write property test for store migration": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102682915
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102884074
+      }
+    ],
+    "3. Demo data": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102886673
+      }
+    ],
+    "1.11 Write property test for sequence numbers": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102887691
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102983624
+      }
+    ],
+    "1.12 Write property test for contiguous periods": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102889041
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102986867
+      }
+    ],
+    "1.13 Write property test for carry-over": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102890041
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102987902
+      }
+    ],
+    "1.14 Write property test for immutability and legacy edits": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102891048
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102984970
+      }
+    ],
+    "1.15 Write property test for delete and cancel control": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102891948
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102985875
+      }
+    ],
+    "2.3 Write unit tests for the store": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795102988549
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103053242
+      }
+    ],
+    "1.4 Write property test for the Won gate": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103071558
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103198405
+      }
+    ],
+    "4.4 Add architecture tests": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103201848
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103442943
+      }
+    ],
+    "3.2 Write unit tests for the demo seed": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103203659
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103438471
+      }
+    ],
+    "6. CRM integration": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103440593
+      }
+    ],
+    "4. Facade and tax invoice service": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103441524
+      }
+    ],
+    "4.3 Write service and facade tests": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103443525
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103699054
+      }
+    ],
+    "6.3 Write CRM tests": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103444945
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103699344
+      }
+    ],
+    "7. Invoice page": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103700440
+      }
+    ],
+    "7.3 Write component tests for the Invoice page": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795103701083
+      },
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795107585831
+      }
+    ],
+    "9. Final verification": [
+      {
+        "executionId": "f7019ca0-3fdb-42c0-bac5-861cf18929a5",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795108351509
+      }
+    ]
+  }
+}

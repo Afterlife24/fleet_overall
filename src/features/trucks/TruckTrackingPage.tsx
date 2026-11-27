@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { useTransportJobs } from '@/hooks/useQueries';
-import { useBranchFilter } from '@/hooks/useBranchFilter';
+import { useTransportJobViews } from '@/hooks/api/useTransportApi';
+import { ApiErrorNotice, ApiSessionGate } from '@/components/common/ApiStatus';
 import { DEFAULT_COORD, coordForTransportJob, NAMED_LOCATIONS } from '@/constants/geoCoords';
 import { Truck as TruckIcon, X, MapPin, User, Package } from 'lucide-react';
 import type { TransportJob } from '@/types/transport';
@@ -32,14 +32,23 @@ interface SelectedTruck {
 }
 
 export function TruckTrackingPage() {
+  return (
+    <ApiSessionGate>
+      <TruckTrackingMap />
+    </ApiSessionGate>
+  );
+}
+
+function TruckTrackingMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markerLayer = useRef<any>(null);
   const [selected, setSelected] = useState<SelectedTruck | null>(null);
   const [leafletReady, setLeafletReady] = useState(typeof L !== 'undefined');
 
-  const { data: allJobs } = useTransportJobs();
-  const jobs = useBranchFilter(allJobs);
+  const { data: allJobs, isError, error, refetch } = useTransportJobViews();
+  // The server already limits the list to the branches this user may see.
+  const jobs = useMemo(() => allJobs ?? [], [allJobs]);
 
   // Wait for CDN Leaflet
   useEffect(() => {
@@ -82,11 +91,11 @@ export function TruckTrackingPage() {
         truck: {
           reference: j.reference,
           truck: j.truckRegistration,
-          driver: j.driverName,
+          driver: j.driverName || 'Unassigned',
           status: j.status,
           route: `${j.origin} → ${j.destination}`,
           machine: `${j.assetNumber} · ${j.machineModel}`,
-          customer: j.customerName ?? 'Internal',
+          customer: j.customerName || 'Internal',
           position: c.place,
         } as SelectedTruck,
       };
@@ -131,6 +140,8 @@ export function TruckTrackingPage() {
         title="Truck Tracking"
         description="Live transport job positions and routes (demo coordinates)"
       />
+
+      {isError && <ApiErrorNotice error={error} onRetry={refetch} />}
 
       {/* Stats strip */}
       <div className="flex flex-wrap gap-3 text-sm">

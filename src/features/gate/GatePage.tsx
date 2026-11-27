@@ -1,96 +1,187 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Clock, LogIn, LogOut, Plus, Search } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SlideOver } from '@/components/common/SlideOver';
-import { InfoGrid, InfoRow, SectionTitle } from '@/components/common/InfoGrid';
-import { useGateEntries, useApproveGateEntry, useCompleteGateEntry } from '@/hooks/useQueries';
-import { useBranchFilter } from '@/hooks/useBranchFilter';
-import { GateEntry } from '@/types/gate';
-import { formatDateTime, timeAgo } from '@/utils/format';
+import { LoadingState } from '@/components/common/EmptyState';
+import { ApiErrorNotice, ApiSessionGate, describeApiError } from '@/components/common/ApiStatus';
+import {
+  useApproveGatePass, useCan, useCancelGatePass, useCompleteGatePass, useGatePasses,
+} from '@/hooks/api/useGateApi';
+import { useFleetMachines } from '@/hooks/useApiResources';
+import type { GatePassDto } from '@/services/api/gate';
+import { PURPOSE_LABEL } from '@/services/api/gateMappers';
+import { timeAgo } from '@/utils/format';
 import { cn } from '@/lib/utils';
-import { toastSuccess, toastError } from '@/lib/toast-helper';
+import { toastSuccess } from '@/lib/toast-helper';
 import { GatePassDialog } from './GatePassDialog';
-import { LogIn, LogOut, Plus, Search, Clock, MapPin, FileText, Truck, User, Package } from 'lucide-react';
+import { GatePassPanel } from './GatePassPanel';
 
+export const REOPEN_REQUIRED_MESSAGE =
+  'The quotation for this booking is Lost. Reopen the quotation in CRM, then complete this pass again. The machine has not moved.';
+
+/** Gate Operations. Passes, approvals and movements come from `/api/v1/gate-passes`; waits for the API session. */
 export function GatePage() {
-  const { data: entries, isLoading } = useGateEntries();
-  const filteredEntries = useBranchFilter(entries);
+  return (
+    <ApiSessionGate>
+      <GateScreen />
+    </ApiSessionGate>
+  );
+}
+
+interface ActionFailure { error: unknown; passId: string | null }
+
+function GateScreen() {
+  const passesQuery = useGatePasses();
+  const machinesQuery = useFleetMachines();
+  const canWrite = useCan('gate.write');
+  const canApprove = useCan('gate.approve');
+  const approve = useApproveGatePass();
+  const complete = useCompleteGatePass();
+  const cancel = useCancelGatePass();
+
   const [tab, setTab] = useState<'entry' | 'exit' | 'log'>('entry');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<GateEntry | null>(null);
-  const [createPassOpen, setCreatePassOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [cancelling, setCancelling] = useState<GatePassDto | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [failure, setFailure] = useState<ActionFailure | null>(null);
 
-  const approveMutation = useApproveGateEntry();
-  const completeMutation = useCompleteGateEntry();
-
-  const handleApprove = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await approveMutation.mutateAsync(id);
-      toastSuccess('Gate entry approved successfully');
-    } catch (error) {
-      toastError('Failed to approve gate entry');
-    }
-  };
-
-  const handleComplete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await completeMutation.mutateAsync(id);
-      toastSuccess('Gate entry completed successfully');
-      setSelected(null);
-    } catch (error) {
-      toastError('Failed to complete gate entry');
-    }
+  const passes = passesQuery.data ?? [];
+  const selected = passes.find((p) => p.id === selectedId) ?? null;
+  const machineById = useMemo(() => new Map((machinesQuery.data ?? []).map((m) => [m.id, m])), [machinesQuery.data]);
+  const info = (p: GatePassDto) => {
+    const m = machineById.get(p.machineId);
+    return { assetNumber: m?.fleetNo ?? m?.assetNumber ?? p.fleetNoSnapshot, model: m ? `${m.make} ${m.model}`.trim() : '', branchName: m?.branchName };
   };
 
   const data = useMemo(() => {
-    if (!filteredEntries) return [];
-    let list = filteredEntries;
-    if (tab === 'entry') list = list.filter((e) => e.direction === 'IN');
-    if (tab === 'exit') list = list.filter((e) => e.direction === 'OUT');
+    let list = passes;
+    if (tab === 'entry') list = list.filter((p) => p.direction === 'IN');
+    if (tab === 'exit') list = list.filter((p) => p.direction === 'OUT');
+    if (tab === 'log') list = list.filter((p) => p.status === 'Completed');
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((e) =>
-        e.assetNumber.toLowerCase().includes(q) ||
-        e.machineModel.toLowerCase().includes(q) ||
-        e.driver.toLowerCase().includes(q) ||
-        e.reference.toLowerCase().includes(q)
-      );
+      list = list.filter((p) => {
+        const m = info(p);
+        return p.fleetNoSnapshot.toLowerCase().includes(q) || m.model.toLowerCase().includes(q)
+          || p.driverName.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q);
+      });
     }
     return list;
-  }, [filteredEntries, tab, search]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passes, tab, search, machineById]);
 
-  const pending = filteredEntries.filter((e) => e.status === 'Pending').length;
-  const inCount = filteredEntries.filter((e) => e.direction === 'IN').length;
-  const outCount = filteredEntries.filter((e) => e.direction === 'OUT').length;
+  const pending = passes.filter((p) => p.status === 'Pending').length;
+  const inCount = passes.filter((p) => p.direction === 'IN').length;
+  const outCount = passes.filter((p) => p.direction === 'OUT').length;
+
+  const reload = () => {
+    setFailure(null);
+    void passesQuery.refetch();
+  };
+
+  const onApprove = (p: GatePassDto) => {
+    setFailure(null);
+    approve.mutate({ id: p.id, rowVersion: p.rowVersion }, {
+      onSuccess: () => toastSuccess(`Gate pass ${p.reference} approved. The machine has not moved yet.`),
+      onError: (error) => setFailure({ error, passId: p.id }),
+    });
+  };
+
+  const onComplete = (p: GatePassDto) => {
+    setFailure(null);
+    complete.mutate({ id: p.id }, {
+      onSuccess: (res) => {
+        const base = res.alreadyCompleted ? `Gate pass ${p.reference} was already completed.` : `Gate pass ${p.reference} completed. Movement recorded.`;
+        toastSuccess(res.inspection ? `${base} Return intake inspection ${res.inspection.reference} is open on the PHI page.` : base);
+      },
+      onError: (error) => setFailure({ error, passId: p.id }),
+    });
+  };
+
+  const onCancelConfirm = () => {
+    if (!cancelling || !cancelReason.trim()) return;
+    const p = passes.find((x) => x.id === cancelling.id) ?? cancelling;
+    setFailure(null);
+    cancel.mutate({ id: p.id, rowVersion: p.rowVersion, reason: cancelReason.trim() }, {
+      onSuccess: () => {
+        toastSuccess(`Gate pass ${p.reference} cancelled`);
+        setCancelling(null);
+        setCancelReason('');
+      },
+      onError: (error) => setFailure({ error, passId: p.id }),
+    });
+  };
+
+  const busyId = (approve.isPending && approve.variables?.id) || (complete.isPending && complete.variables?.id) || null;
+
+  const rowActions = (p: GatePassDto) => (
+    <>
+      {p.status === 'Pending' && canApprove && (
+        <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => onApprove(p)}>
+          {approve.isPending && approve.variables?.id === p.id ? 'Approving...' : 'Approve'}
+        </Button>
+      )}
+      {p.status === 'Approved' && canWrite && (
+        <Button size="sm" disabled={busyId === p.id} onClick={() => onComplete(p)}>
+          {complete.isPending && complete.variables?.id === p.id ? 'Completing...' : 'Complete'}
+        </Button>
+      )}
+      {(p.status === 'Pending' || p.status === 'Approved') && canWrite && (p.status === 'Pending' || canApprove) && (
+        <Button size="sm" variant="ghost" disabled={busyId === p.id} onClick={() => { setCancelling(p); setCancelReason(''); setFailure(null); }}>
+          Cancel
+        </Button>
+      )}
+      {p.status === 'Completed' && <span className="text-xs text-muted-foreground">Done</span>}
+      {p.status === 'Cancelled' && <span className="text-xs text-muted-foreground">Cancelled</span>}
+    </>
+  );
+
+  const failureInfo = failure ? describeApiError(failure.error) : null;
 
   return (
     <div className="space-y-5">
       <PageHeader
         title="Gate Operations"
-        description="Check-in and check-out processing for fleet movements"
-        actions={<Button size="sm" onClick={() => setCreatePassOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> New Gate Pass</Button>}
+        description="Check-in and check-out processing for fleet movements. A pass does not move the machine until it is approved and completed."
+        actions={canWrite ? <Button size="sm" onClick={() => setCreateOpen(true)}><Plus className="mr-1.5 h-4 w-4" /> New Gate Pass</Button> : undefined}
       />
+
+      {failure && failureInfo?.code === 'REOPEN_REQUIRED' && (
+        <div role="alert" data-testid="reopen-required" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium">{REOPEN_REQUIRED_MESSAGE}</p>
+          {failureInfo.correlationId && <p className="mt-1 text-xs">Correlation ID: <span className="font-mono">{failureInfo.correlationId}</span></p>}
+          <Link to="/crm" className="mt-1 inline-block text-xs underline">Open CRM</Link>
+        </div>
+      )}
+      {failure && failureInfo?.code !== 'REOPEN_REQUIRED' && failure.passId !== cancelling?.id && (
+        <ApiErrorNotice error={failure.error} onReload={reload} reloading={passesQuery.isFetching} />
+      )}
+      {passesQuery.isError && <ApiErrorNotice error={passesQuery.error} onRetry={() => void passesQuery.refetch()} />}
 
       <div className="grid grid-cols-3 gap-3">
         <Card className="p-4">
-          <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-500" /><p className="text-xs text-muted-foreground uppercase tracking-wider">Pending</p></div>
+          <div className="flex items-center gap-2"><Clock className="h-4 w-4 text-amber-500" /><p className="text-xs uppercase tracking-wider text-muted-foreground">Pending</p></div>
           <p className="mt-1 text-xl font-semibold text-amber-600 dark:text-amber-400">{pending}</p>
         </Card>
         <Card className="p-4">
-          <div className="flex items-center gap-2"><LogIn className="h-4 w-4 text-emerald-500" /><p className="text-xs text-muted-foreground uppercase tracking-wider">Check-ins</p></div>
+          <div className="flex items-center gap-2"><LogIn className="h-4 w-4 text-emerald-500" /><p className="text-xs uppercase tracking-wider text-muted-foreground">Check-ins</p></div>
           <p className="mt-1 text-xl font-semibold">{inCount}</p>
         </Card>
         <Card className="p-4">
-          <div className="flex items-center gap-2"><LogOut className="h-4 w-4 text-sky-500" /><p className="text-xs text-muted-foreground uppercase tracking-wider">Check-outs</p></div>
+          <div className="flex items-center gap-2"><LogOut className="h-4 w-4 text-sky-500" /><p className="text-xs uppercase tracking-wider text-muted-foreground">Check-outs</p></div>
           <p className="mt-1 text-xl font-semibold">{outCount}</p>
         </Card>
       </div>
 
-      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+      <div className="flex w-fit gap-1 rounded-lg bg-muted p-1">
         {(['entry', 'exit', 'log'] as const).map((t) => (
           <button
             key={t}
@@ -102,89 +193,64 @@ export function GatePage() {
         ))}
       </div>
 
-      {tab !== 'log' && (
-        <div className="relative max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search asset, model, driver..."
-            className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
-        </div>
-      )}
+      <div className="relative max-w-xs">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search asset, model, driver..."
+          className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+      </div>
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-border bg-muted/30">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Reference</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Machine</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Direction</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Driver</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Destination / Source</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Time</th>
-                <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Status</th>
+                {['Reference', 'Machine', 'Direction', 'Purpose', 'Driver', 'Destination / Source', tab === 'log' ? 'Crossed' : 'Requested', 'Status'].map((h) => (
+                  <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">{h}</th>
+                ))}
                 <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Action</th>
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
-                <tr><td colSpan={8} className="py-12 text-center text-sm text-muted-foreground">Loading gate entries...</td></tr>
+              {passesQuery.isLoading ? (
+                <tr><td colSpan={9} className="py-12 text-center text-sm text-muted-foreground"><LoadingState /></td></tr>
               ) : data.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-sm text-muted-foreground">No entries found</td></tr>
+                <tr><td colSpan={9} className="py-12 text-center text-sm text-muted-foreground">No entries found</td></tr>
               ) : (
-                data.map((entry) => (
-                  <tr
-                    key={entry.id}
-                    onClick={() => setSelected(entry)}
-                    className="cursor-pointer border-b border-border last:border-0 transition-colors hover:bg-muted/20"
-                  >
-                    <td className="px-4 py-3 font-medium text-foreground">{entry.reference}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{entry.assetNumber}</span>
-                        <span className="text-xs text-muted-foreground">{entry.machineModel}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={cn(
-                        'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
-                        entry.direction === 'IN' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400'
-                      )}>
-                        {entry.direction === 'IN' ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}
-                        {entry.direction}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{entry.driver}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{entry.destination}</td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{timeAgo(entry.timestamp)}</td>
-                    <td className="px-4 py-3"><StatusBadge status={entry.status} size="sm" /></td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                      {entry.status === 'Pending' && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={(e) => handleApprove(entry.id, e)}
-                          disabled={approveMutation.isPending}
-                        >
-                          {approveMutation.isPending ? 'Approving...' : 'Approve'}
-                        </Button>
-                      )}
-                      {entry.status === 'Approved' && (
-                        <Button 
-                          size="sm"
-                          onClick={(e) => handleComplete(entry.id, e)}
-                          disabled={completeMutation.isPending}
-                        >
-                          {completeMutation.isPending ? 'Completing...' : 'Complete'}
-                        </Button>
-                      )}
-                      {entry.status === 'Completed' && <span className="text-xs text-muted-foreground">Done</span>}
-                    </td>
-                  </tr>
-                ))
+                data.map((p) => {
+                  const m = info(p);
+                  return (
+                    <tr key={p.id} onClick={() => setSelectedId(p.id)} className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/20">
+                      <td className="px-4 py-3 font-medium text-foreground">{p.reference}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground">{m.assetNumber}</span>
+                          <span className="text-xs text-muted-foreground">{m.model}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
+                          p.direction === 'IN' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400',
+                        )}>
+                          {p.direction === 'IN' ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}
+                          {p.direction}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{PURPOSE_LABEL[p.movementPurpose]}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{p.driverName}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{p.direction === 'IN' ? (p.arrivingFrom ?? p.destination) : p.destination}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{timeAgo(tab === 'log' && p.movement ? p.movement.occurredAt : p.requestedAt)}</td>
+                      <td className="px-4 py-3"><StatusBadge status={p.status} size="sm" /></td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end gap-1">{rowActions(p)}</div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -193,54 +259,32 @@ export function GatePage() {
 
       <SlideOver
         open={!!selected}
-        onClose={() => setSelected(null)}
+        onClose={() => setSelectedId(null)}
         title={selected ? selected.reference : ''}
-        description={selected ? `${selected.assetNumber} · ${selected.machineModel}` : ''}
+        description={selected ? `${info(selected).assetNumber} · ${info(selected).model}` : ''}
         width="md"
-        footer={
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1">Print Gate Pass</Button>
-            <Button size="sm" className="flex-1">Process Entry</Button>
-          </div>
-        }
       >
-        {selected && (
-          <div className="space-y-1">
-            <div className="mb-4 flex items-center gap-2">
-              <StatusBadge status={selected.status} />
-              <span className={cn(
-                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium',
-                selected.direction === 'IN' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400'
-              )}>
-                {selected.direction === 'IN' ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}
-                {selected.direction === 'IN' ? 'Check-in' : 'Check-out'}
-              </span>
-            </div>
-            <SectionTitle>Gate Entry Details (REF-06)</SectionTitle>
-            <InfoGrid columns={2}>
-              <InfoRow label="Fleet No. (EqptNo)" value={selected.assetNumber} />
-              <InfoRow label="Truck Plate" value={(selected as any).truckPlate ?? '—'} />
-              <InfoRow label="Arriving From" value={(selected as any).arrivingFrom ?? selected.destination} />
-              <InfoRow label="Direction" value={selected.direction === 'IN' ? 'IN — Machine arriving' : 'OUT — Machine departing'} />
-              <InfoRow label="Gate Pass" value={selected.gatePass} />
-              <InfoRow label="Driver" value={selected.driver} />
-              <InfoRow label="Branch" value={selected.branchName} />
-              <InfoRow label="Timestamp" value={formatDateTime(selected.timestamp)} />
-            </InfoGrid>
-            {selected.notes && (
-              <>
-                <SectionTitle>Notes</SectionTitle>
-                <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">{selected.notes}</p>
-              </>
-            )}
-          </div>
-        )}
+        {selected && <GatePassPanel key={selected.id} pass={selected} machine={info(selected)} actions={rowActions(selected)} />}
       </SlideOver>
 
-      <GatePassDialog 
-        open={createPassOpen} 
-        onClose={() => setCreatePassOpen(false)} 
-      />
+      <GatePassDialog open={createOpen} onClose={() => setCreateOpen(false)} onOpenPass={(id) => setSelectedId(id)} />
+
+      <Dialog open={!!cancelling} onOpenChange={(o) => { if (!o) setCancelling(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel gate pass {cancelling?.reference}</DialogTitle>
+            <DialogDescription>The pass will be closed. Nothing has moved, so no machine or booking changes.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="Reason (required)" rows={3} aria-label="Cancel reason" />
+          {failure && failure.passId === cancelling?.id && <ApiErrorNotice error={failure.error} onReload={reload} reloading={passesQuery.isFetching} />}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelling(null)}>Keep pass</Button>
+            <Button disabled={!cancelReason.trim() || cancel.isPending} onClick={onCancelConfirm}>
+              {cancel.isPending ? 'Cancelling...' : 'Cancel pass'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

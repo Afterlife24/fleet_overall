@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useBookingStore } from '@/store/bookingStore';
-import { branches } from '@/services/mock/branches';
+import { useApiBranches } from '@/hooks/useApiResources';
+import { useBookings } from '@/hooks/api/usePlannerApi';
 
 // Matches Sheet1 of REF-08 — daily New Hires / Off Hires per branch + UAE total
 // new_hires(date, branch) = bookings where startDate = date AND branch = branch
@@ -36,8 +36,14 @@ interface HiresSummaryWidgetProps {
 }
 
 export function HiresSummaryWidget({ dayCount = 14 }: HiresSummaryWidgetProps) {
-  const { getAllBookings } = useBookingStore();
-  const allBookings = getAllBookings();
+  const bookingsQuery = useBookings();
+  const branchesQuery = useApiBranches();
+  // Cancelled bookings never start or end a hire.
+  const allBookings = useMemo(
+    () => (bookingsQuery.data ?? []).filter((b) => b.status !== 'Cancelled'),
+    [bookingsQuery.data],
+  );
+  const branches = useMemo(() => branchesQuery.data ?? [], [branchesQuery.data]);
 
   // Build date range starting from today
   const dateRange: string[] = useMemo(() => {
@@ -76,7 +82,7 @@ export function HiresSummaryWidget({ dayCount = 14 }: HiresSummaryWidgetProps) {
         totalNet: totalNew - totalOff,
       };
     }).filter(b => b.totalNew > 0 || b.totalOff > 0 || true); // show all branches
-  }, [allBookings, dateRange]);
+  }, [allBookings, branches, dateRange]);
 
   // UAE total row (all branches combined)
   const uaeTotal: DaySummary[] = useMemo(() => {

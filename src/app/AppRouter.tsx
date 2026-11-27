@@ -37,7 +37,15 @@ const SixSigmaPage = lazy(() => import('@/features/sixsigma/SixSigmaPage').then(
 const StatisticsPage = lazy(() => import('@/features/statistics/StatisticsPage').then(m => ({ default: m.StatisticsPage })));
 const BranchesPage = lazy(() => import('@/features/branches/BranchesPage').then(m => ({ default: m.BranchesPage })));
 const DocumentAppPage = lazy(() => import('@/features/documents/DocumentAppPage').then(m => ({ default: m.DocumentAppPage })));
+const DeliveryNotePage = lazy(() => import('@/features/documents/DeliveryNotePage').then(m => ({ default: m.DeliveryNotePage })));
+const LpoPage = lazy(() => import('@/features/documents/LpoPage').then(m => ({ default: m.LpoPage })));
 const NotFoundPage = lazy(() => import('@/features/common/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
+const CustomerANIPage = lazy(() => import('@/features/customerani/CustomerANIPage').then(m => ({ default: m.CustomerANIPage })));
+const CrmPage = lazy(() => import('@/features/crm/CrmPage').then(m => ({ default: m.CrmPage })));
+const CollectionNoteRoute = lazy(() => import('@/app/collectionRoutes').then(m => ({ default: m.CollectionNoteRoute })));
+const ThirdPartyServicesPage = lazy(() => import('@/features/thirdparty/ThirdPartyServicesPage').then(m => ({ default: m.ThirdPartyServicesPage })));
+const InvoicePage = lazy(() => import('@/features/documents/InvoicePage').then(m => ({ default: m.InvoicePage })));
+const HireAgreementPage = lazy(() => import('@/features/documents/HireAgreementPage').then(m => ({ default: m.HireAgreementPage })));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -148,13 +156,18 @@ export function AppRouter() {
           <Route path="/six-sigma" element={<AppGuard><Suspense fallback={<LoadingState />}><SixSigmaPage /></Suspense></AppGuard>} />
           <Route path="/statistics" element={<AppGuard><Suspense fallback={<LoadingState />}><StatisticsPage /></Suspense></AppGuard>} />
           <Route path="/branches" element={<AppGuard><Suspense fallback={<LoadingState />}><BranchesPage /></Suspense></AppGuard>} />
-          <Route path="/docs/quotation" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="quotation" /></Suspense></AppGuard>} />
-          <Route path="/docs/lpo" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="lpo" /></Suspense></AppGuard>} />
-          <Route path="/docs/delivery-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="delivery_note" /></Suspense></AppGuard>} />
-          <Route path="/docs/collection-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="collection_note" /></Suspense></AppGuard>} />
-          <Route path="/docs/invoice" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="invoice" /></Suspense></AppGuard>} />
+          <Route path="/docs/quotation" element={<AppGuard><Suspense fallback={<LoadingState />}><HireAgreementPage /></Suspense></AppGuard>} />
+          <Route path="/docs/lpo" element={<AppGuard><Suspense fallback={<LoadingState />}><LpoPage /></Suspense></AppGuard>} />
+          <Route path="/docs/delivery-note" element={<AppGuard><Suspense fallback={<LoadingState />}><DeliveryNotePage /></Suspense></AppGuard>} />
+          <Route path="/docs/collection-note" element={<AppGuard><Suspense fallback={<LoadingState />}><CollectionNoteRoute /></Suspense></AppGuard>} />
+          <Route path="/docs/third-party-services" element={<AppGuard><Suspense fallback={<LoadingState />}><ThirdPartyServicesPage /></Suspense></AppGuard>} />
+          <Route path="/docs/invoice" element={<AppGuard><Suspense fallback={<LoadingState />}><InvoicePage /></Suspense></AppGuard>} />
           <Route path="/docs/soa" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="soa" /></Suspense></AppGuard>} />
           <Route path="/docs/payment-receipt" element={<AppGuard><Suspense fallback={<LoadingState />}><DocumentAppPage appId="payment_receipt" /></Suspense></AppGuard>} />
+          <Route path="/crm" element={<AppGuard><Suspense fallback={<LoadingState />}><CrmPage /></Suspense></AppGuard>} />
+          <Route path="/crm/lost" element={<AppGuard><Suspense fallback={<LoadingState />}><CrmPage /></Suspense></AppGuard>} />
+          <Route path="/crm/won" element={<AppGuard><Suspense fallback={<LoadingState />}><CrmPage /></Suspense></AppGuard>} />
+          <Route path="/customer-ani" element={<AppGuard><Suspense fallback={<LoadingState />}><CustomerANIPage /></Suspense></AppGuard>} />
           <Route path="/notifications" element={<Suspense fallback={<LoadingState />}><NotificationsPage /></Suspense>} />
           <Route path="/users" element={<Navigate to="/team" replace />} />
           <Route path="/settings" element={<AdminGuard><Suspense fallback={<LoadingState />}><SettingsPage /></Suspense></AdminGuard>} />

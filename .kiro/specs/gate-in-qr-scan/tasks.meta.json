@@ -1,0 +1,751 @@
+{
+  "pbtResults": {
+    "14.3 Write property test for gate list isolation": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259187384
+    },
+    "14.4 Write property test for gate list order and shadowing": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259187807
+    },
+    "14.5 Write property test for legacy migration": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259188196
+    },
+    "14.6 Write property test for gate state persistence round trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259189150
+    },
+    "14.7 Write property test for writing the gate link only into an empty link": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259189843
+    },
+    "14.8 Write property test for the status control": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259190352
+    },
+    "13.5 Write property test for collecting with the gate link": {
+      "status": "passed",
+      "lastRunTimestamp": 1795259196180
+    },
+    "16.6 Update the gate service identity property test for the new storage": {
+      "status": "passed",
+      "lastRunTimestamp": 1795263878747
+    },
+    "16.7 Write property test for status change persistence": {
+      "status": "passed",
+      "lastRunTimestamp": 1795263888973
+    }
+  },
+  "executionHistory": {
+    "1.1 Move `jsqr` from `devDependencies` to `dependencies` in `package.json`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253076345
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253357203
+      }
+    ],
+    "1.2 Add capture types and optional fields to the gate record types": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253357718
+      }
+    ],
+    "1. Dependency and shared types": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253357817
+      }
+    ],
+    "2.1 Implement `src/services/serverClock.ts`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253358780
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253555655
+      }
+    ],
+    "2. Server clock service": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253555732
+      }
+    ],
+    "2.2 Write property test for clock offset round trip and accuracy": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253556337
+      }
+    ],
+    "2.3 Write property test for cached offset producing server time": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253557378
+      }
+    ],
+    "2.4 Write property test for clock failure falling back to device time": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253558478
+      }
+    ],
+    "2.5 Write unit test for concurrent `serverNow()` calls": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253559681
+      }
+    ],
+    "3.1 Create `src/services/gateCore.ts` with scan, camera and direction logic": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795253560433
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255179083
+      }
+    ],
+    "3.2 Add `buildGateRecordFields` to `gateCore.ts`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255179951
+      }
+    ],
+    "3.3 Add `formatGateWhen` and `dashIfMissing` to `gateCore.ts`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255180940
+      }
+    ],
+    "3. Pure gate core": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255181021
+      }
+    ],
+    "3.4 Write property test for the scan round trip": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255181912
+      }
+    ],
+    "3.5 Write property test for scan error classification": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255183002
+      }
+    ],
+    "3.6 Write property test for scan messages": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255183958
+      }
+    ],
+    "3.7 Write property test for camera error precedence": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255184941
+      }
+    ],
+    "3.8 Write property test for record fields": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255185891
+      }
+    ],
+    "3.9 Write property test for the local date and time round trip": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255187075
+      }
+    ],
+    "3.10 Write property test for direction": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255188318
+      }
+    ],
+    "3.11 Write property test for dash rendering": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255189531
+      }
+    ],
+    "3.12 Write property test for gate display fallback order": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255190122
+      }
+    ],
+    "4.1 Add `pickNoteToCollect` to `src/services/collectionCore.ts`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255190582
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255401607
+      }
+    ],
+    "4.3 Write property test for picking and collecting a note": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255402558
+      }
+    ],
+    "5.1 Write property test for gate service identity and status": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255403619
+      }
+    ],
+    "5. Gate service identity": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255403710
+      }
+    ],
+    "4.2 Add `markCollectedForMachine` to `src/services/collectionDocs.ts`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255404577
+      }
+    ],
+    "4. Collection note helpers": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255404651
+      }
+    ],
+    "4.4 Write property test for idempotent collecting": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255406005
+      }
+    ],
+    "6.1 Implement `src/features/gate/QrScanner.tsx`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255406558
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255598191
+      }
+    ],
+    "6. QR scanner component": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255598288
+      }
+    ],
+    "7.1 Wire Scan_Mode and Manual_Mode into `src/features/gate/GatePassDialog.tsx`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255598920
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795256226007
+      }
+    ],
+    "6.2 Write component tests for `QrScanner`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795255599562
+      }
+    ],
+    "7.2 Update the existing `src/features/gate/GatePassDialog.test.tsx`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795256226366
+      }
+    ],
+    "7. Gate dialog wiring": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795256226437
+      }
+    ],
+    "7.3 Write new dialog tests in `src/features/gate/GatePassDialog.scan.test.tsx`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795256227812
+      }
+    ],
+    "8.1 Update the detail panel in `src/features/gate/GatePage.tsx`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795256228191
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257045996
+      }
+    ],
+    "8. Gate page detail rows": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257046100
+      }
+    ],
+    "8.2 Write component tests for the Gate page detail panel": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257046877
+      }
+    ],
+    "9.1 Extend `src/architecture.test.ts`": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257047515
+      },
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257241407
+      }
+    ],
+    "9. Architecture tests": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257241508
+      }
+    ],
+    "10. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257568628
+      }
+    ],
+    "12.1 Write a plain step-by-step walkthrough of the Gate-In QR flow and report it in chat": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257568751
+      }
+    ],
+    "11.1 Run the final verification commands and fix any failures": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257568865
+      }
+    ],
+    "12. Walkthrough for the user": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257568949
+      }
+    ],
+    "11. Final verification": [
+      {
+        "executionId": "69daf251-f1b2-4de9-beaa-08a6c5afa097",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795257569251
+      }
+    ],
+    "13.1 Add the `GateRecord` type in `src/types/gate.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795258741756
+      },
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259235675
+      }
+    ],
+    "13.4 Update the existing tests for the new `markCollectedForMachine` signature": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259237081
+      }
+    ],
+    "14.1 Add the list, migration and seed helpers to `src/services/gateCore.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259238073
+      }
+    ],
+    "14.4 Write property test for gate list order and shadowing": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259239029
+      }
+    ],
+    "14.7 Write property test for writing the gate link only into an empty link": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259240164
+      }
+    ],
+    "15.1 Create `src/store/gateStore.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259241551
+      },
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263921460
+      }
+    ],
+    "13.3 Change `markCollectedForMachine` to take the gate link and update its caller": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259242083
+      }
+    ],
+    "14.3 Write property test for gate list isolation": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259243596
+      }
+    ],
+    "14.6 Write property test for gate state persistence round trip": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259244573
+      }
+    ],
+    "13.2 Add the gate link fields to `CollectionNote` in `src/types/collection.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259245580
+      }
+    ],
+    "13. Gate record types and Collection_Gate_Link": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259245810
+      }
+    ],
+    "13.5 Write property test for collecting with the gate link": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259246580
+      }
+    ],
+    "14.2 Add `collectionStatusControl` to `src/services/collectionCore.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259247602
+      }
+    ],
+    "14. Pure helpers for the gate list, migration, seeding and status control": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259247768
+      }
+    ],
+    "14.5 Write property test for legacy migration": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259249106
+      }
+    ],
+    "14.8 Write property test for the status control": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795259249487
+      }
+    ],
+    "15. Gate store": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263921550
+      }
+    ],
+    "15.2 Write unit tests for `gateStore`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263922012
+      }
+    ],
+    "16.1 Rewrite `gateService` in `src/services/services.ts` as a thin wrapper over `gateStore`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263923525
+      }
+    ],
+    "16.2 Add the orgId to the `useGateEntries` query key in `src/hooks/useQueries.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263924500
+      }
+    ],
+    "16.3 Stop writing gate records to `appStore` in `GatePassDialog.tsx`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263925508
+      }
+    ],
+    "16.4 Update the dialog tests to assert on `gateStore`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263926499
+      }
+    ],
+    "16.5 Guard `GatePage.tsx` search and rendering against rows with missing fields": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263927516
+      }
+    ],
+    "16. Gate service on the gate store": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263927596
+      }
+    ],
+    "16.6 Update the gate service identity property test for the new storage": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263928496
+      }
+    ],
+    "16.7 Write property test for status change persistence": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263929515
+      }
+    ],
+    "16.8 Write unit tests for `gateService`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263931311
+      }
+    ],
+    "17.1 Create the pure builder `src/services/mock/demoGate.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795263931768
+      },
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264957760
+      }
+    ],
+    "17.2 Add `ensureGateDemo(orgId)` to `src/services/demoSeed.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264958030
+      }
+    ],
+    "17.3 Wire the seeder into the gate list and the demo app set": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264960663
+      }
+    ],
+    "17.4 Write property test for seeding idempotence": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264961737
+      }
+    ],
+    "17. Per-company demo gate data": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264962138
+      },
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264963410
+      }
+    ],
+    "17.5 Write property test for markers, missing machines and user records": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264962485
+      }
+    ],
+    "17.6 Write property test for well-formed seed records": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264963139
+      }
+    ],
+    "17.7 Write unit tests for the demo seeder": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264963697
+      }
+    ],
+    "17.8 Write the end-to-end scan test for the demo flow": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264964690
+      }
+    ],
+    "18.1 Update `src/features/collection/CollectionDetail.tsx`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795264965720
+      },
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265685814
+      }
+    ],
+    "18.2 Write component tests for `CollectionDetail`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265685688
+      }
+    ],
+    "19.1 Extend `src/architecture.test.ts`": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265686061
+      }
+    ],
+    "20. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265686257
+      }
+    ],
+    "18. Collection Note detail status control": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265686379
+      }
+    ],
+    "19. Architecture tests for gate-only operations": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265687283
+      }
+    ],
+    "21.1 Run the final verification commands and fix any failures": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265688351
+      }
+    ],
+    "21. Final verification for the Requirement 14 to 16 work": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265688875
+      }
+    ],
+    "22.1 Write a step-by-step demo walkthrough and report it in chat": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265689147
+      }
+    ],
+    "22. Demo walkthrough for the user": [
+      {
+        "executionId": "22e13a82-81d1-493b-8434-e3e8e375f2d1",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795265689861
+      }
+    ]
+  }
+}

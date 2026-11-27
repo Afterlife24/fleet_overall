@@ -4,15 +4,17 @@ import type {
   AppNotification, GateEntry,
 } from '@/types';
 import type { CrossHire } from '@/types/crosshire';
+import type { CustomerANI } from '@/types/customerani';
 import { JA_ORG_ID } from '@/store/orgStore';
 import demo from './johnsonArabiaDemo.json';
+import { customerANIs as demoCustomerANIs } from './customerani';
 
 /**
  * Per-organization data (demo).
  *
  * - Johnson Arabia (JA_ORG_ID) is the built-in demo company. ALL of its data
  *   lives in one static file: johnsonArabiaDemo.json.
- * - Every other (signed-up) company starts COMPLETELY EMPTY — no machines, no
+ * - Every other (signed-up) company starts COMPLETELY EMPTY â€” no machines, no
  *   bookings, no branches, nothing. The owner builds everything from scratch,
  *   like a fresh Odoo database.
  *
@@ -59,6 +61,16 @@ function collectionForOrg<K extends Coll>(orgId: string, name: K): DemoData[K] {
 }
 
 export const machinesForOrg = (orgId: string) => collectionForOrg(orgId, 'machines');
+
+/** Finds a machine by id in any company's loaded machine list (used for its base status). */
+export function findLoadedMachine(machineId: string): Machine | undefined {
+  for (const key of Object.keys(cache)) {
+    if (!key.endsWith(':machines')) continue;
+    const hit = (cache[key] as Machine[]).find((m) => m.id === machineId);
+    if (hit) return hit;
+  }
+  return undefined;
+}
 export const crossHiresForOrg = (orgId: string) => collectionForOrg(orgId, 'crossHires');
 export const bookingsForOrg = (orgId: string) => collectionForOrg(orgId, 'bookings');
 export const workshopJobsForOrg = (orgId: string) => collectionForOrg(orgId, 'workshopJobs');
@@ -78,3 +90,14 @@ export const notificationsForOrg = (orgId: string) => collectionForOrg(orgId, 'n
 // Branches: Johnson Arabia has its 6 real branches; a new company has none
 // until the owner creates them.
 export const branchesForOrg = (orgId: string) => collectionForOrg(orgId, 'branches');
+
+// â”€â”€ Customer ANI (independent dataset, not part of the JA demo JSON) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// JA org gets the full 20-record demo set; new orgs start empty.
+const customerANICache: Record<string, CustomerANI[]> = {};
+
+export function customerANIsForOrg(orgId: string): CustomerANI[] {
+  if (!customerANICache[orgId]) {
+    customerANICache[orgId] = [...demoCustomerANIs]; // all orgs get the 5 demo customers
+  }
+  return customerANICache[orgId];
+}

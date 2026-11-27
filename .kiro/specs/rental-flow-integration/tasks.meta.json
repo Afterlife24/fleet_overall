@@ -1,0 +1,338 @@
+{
+  "pbtResults": {
+    "1.3 Write property test for reference issuance": {
+      "status": "passed",
+      "lastRunTimestamp": 1795270443287
+    },
+    "1.4 Write property test for seed planning": {
+      "status": "passed",
+      "lastRunTimestamp": 1795270443633
+    },
+    "2.11 Write property test for status change round trip": {
+      "status": "passed",
+      "lastRunTimestamp": 1795272427795
+    },
+    "2.8 Write property tests for transport mapping and validation": {
+      "status": "passed",
+      "lastRunTimestamp": 1795272467685
+    },
+    "2.9 Write property tests for transport list and detail rows": {
+      "status": "passed",
+      "lastRunTimestamp": 1795272476782
+    },
+    "2.10 Write property test for transport store isolation and persistence": {
+      "status": "passed",
+      "lastRunTimestamp": 1795272482095
+    },
+    "3.6 Write property tests for phase rules": {
+      "status": "passed",
+      "lastRunTimestamp": 1795284471670
+    },
+    "3.7 Write property tests for board summaries and cards": {
+      "status": "passed",
+      "lastRunTimestamp": 1795284472277
+    },
+    "3.9 Write property test for CRM store persistence": {
+      "status": "passed",
+      "lastRunTimestamp": 1795284472691
+    }
+  },
+  "executionHistory": {
+    "1.1 Create `src/services/refCounterCore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270089048
+      },
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270463660
+      }
+    ],
+    "1.2 Create `src/services/seedCore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270464327
+      }
+    ],
+    "1. Shared pure cores": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270464429
+      }
+    ],
+    "1.3 Write property test for reference issuance": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270465223
+      }
+    ],
+    "1.4 Write property test for seed planning": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270466299
+      }
+    ],
+    "2.1 Update transport types": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795270466970
+      },
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272800226
+      }
+    ],
+    "2.4 Rewrite `transportService` in `src/services/services.ts` and its React Query hooks": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272800943
+      }
+    ],
+    "2.5 Change `src/features/fleet/collectionWiring.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272802725
+      }
+    ],
+    "2.7 Make the other transport consumers compile and render": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272803608
+      }
+    ],
+    "2.8 Write property tests for transport mapping and validation": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272804658
+      }
+    ],
+    "2.11 Write property test for status change round trip": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272804985
+      }
+    ],
+    "2.3 Create `src/store/transportStore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272806189
+      }
+    ],
+    "2.6 Update `TransportPage.tsx` and `TransportJobDialog.tsx`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272806727
+      }
+    ],
+    "2.12 Write component tests for the Transport page and dialog": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272808168
+      }
+    ],
+    "2.2 Create `src/services/transportCore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272808899
+      }
+    ],
+    "2. Transport job creation that is stored and viewable": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272809185
+      }
+    ],
+    "2.9 Write property tests for transport list and detail rows": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272810445
+      }
+    ],
+    "2.10 Write property test for transport store isolation and persistence": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272810851
+      }
+    ],
+    "4.1 Create `src/services/customerCore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795272811524
+      },
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273714642
+      }
+    ],
+    "4.3 Delegate `customerANIService` and `customerService` to the registry in `src/services/services.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273715175
+      }
+    ],
+    "4.5 Create customers through `findOrCreate` in `CrmPage.onCreate`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273715957
+      }
+    ],
+    "4.2 Create `src/store/customerStore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273716955
+      }
+    ],
+    "4.4 Add customer links to the Customers detail view": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273718206
+      }
+    ],
+    "4. Customer registry": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273718322
+      }
+    ],
+    "4.6 Write property test for customer find-or-create": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795273718838
+      },
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795274563875
+      }
+    ],
+    "4.7 Write property test for customer store persistence": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795274564789
+      }
+    ],
+    "4.8 Write component tests for customers": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795274565764
+      }
+    ],
+    "3.1 Create `src/features/crm/statusPanelCore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795274566322
+      },
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284505270
+      }
+    ],
+    "3.2 Extract `src/features/crm/PipelineBoard.tsx`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284505631
+      }
+    ],
+    "3.3 Add the status editor to `QuotationDetail` in `src/features/crm/CrmShared.tsx`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284506468
+      }
+    ],
+    "3.4 Wire `CrmPage.tsx` to the board and panel": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284507471
+      }
+    ],
+    "3.5 Migrate `crmStore` to persist version 4": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284508732
+      }
+    ],
+    "3. CRM four-column pipeline and Status panel": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284508901
+      }
+    ],
+    "3.6 Write property tests for phase rules": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284509950
+      }
+    ],
+    "3.7 Write property tests for board summaries and cards": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284510616
+      }
+    ],
+    "3.8 Write component tests for the pipeline and panel": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284512006
+      }
+    ],
+    "3.9 Write property test for CRM store persistence": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284512993
+      }
+    ],
+    "5.1 Create `src/services/gatePassCore.ts`": [
+      {
+        "executionId": "ca5e2a0e-8e95-4258-90f2-696fb4cfb770",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795284513467
+      },
+      {
+        "executionId": "0863cff5-0012-478d-a063-ccf35957a54e",
+        "chatSessionId": "sess_d85c4630-703b-4723-9daa-37448754041c",
+        "timestamp": 1795354598322
+      }
+    ]
+  }
+}

@@ -3,11 +3,15 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingState } from '@/components/common/EmptyState';
-import { useWorkshopJobs, useTransportJobs, useUpdateWorkshopJobStatus, useUpdateTransportJobStatus } from '@/hooks/useQueries';
+import { ApiErrorNotice, ApiSessionGate, errorText } from '@/components/common/ApiStatus';
+import { useWorkshopJobs, useUpdateWorkshopJobStatus } from '@/hooks/useQueries';
+import { useChangeTransportJobStatus, useTransportJobViews } from '@/hooks/api/useTransportApi';
 import { useBranchFilter } from '@/hooks/useBranchFilter';
 import { getStatusColor } from '@/utils/statusColors';
+import type { TransportJobStatusValue } from '@/services/api/transport';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { toastError } from '@/lib/toast-helper';
 import { Wrench, Truck, GripVertical, MapPin, User } from 'lucide-react';
 
 type BoardMode = 'workshop' | 'transport';
@@ -49,7 +53,7 @@ export function KanbanPage() {
         </button>
       </div>
 
-      {mode === 'workshop' ? <WorkshopBoard /> : <TransportBoard />}
+      {mode === 'workshop' ? <WorkshopBoard /> : <ApiSessionGate><TransportBoard /></ApiSessionGate>}
     </div>
   );
 }
@@ -123,9 +127,12 @@ function WorkshopBoard() {
 
 // ── Transport board ─────────────────────────────────────────────────────────
 function TransportBoard() {
-  const { data: allJobs, isLoading } = useTransportJobs();
-  const jobs = useBranchFilter(allJobs);
-  const updateStatus = useUpdateTransportJobStatus();
+  const jobsQuery = useTransportJobViews();
+  const { isLoading } = jobsQuery;
+  // The server already limits the list to the branches this user may see.
+  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
+  const changeStatus = useChangeTransportJobStatus();
+  const [actionError, setActionError] = useState<unknown>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
 
@@ -140,8 +147,14 @@ function TransportBoard() {
     if (dragId) {
       const job = jobs.find((j) => j.id === dragId);
       if (job && job.status !== col) {
-        updateStatus.mutate({ id: dragId, status: col });
-        toast.success(`${job.assetNumber} → ${col}`);
+        setActionError(null);
+        changeStatus.mutate(
+          { id: job.id, rowVersion: job.rowVersion, status: col as TransportJobStatusValue },
+          {
+            onSuccess: () => toast.success(`${job.assetNumber} → ${col}`),
+            onError: (err) => { setActionError(err); toastError(errorText(err)); },
+          },
+        );
       }
     }
     setDragId(null);
@@ -149,8 +162,11 @@ function TransportBoard() {
   };
 
   if (isLoading) return <LoadingState />;
+  if (jobsQuery.isError) return <ApiErrorNotice error={jobsQuery.error} onRetry={jobsQuery.refetch} />;
 
   return (
+    <div className="space-y-3">
+    {actionError != null && <ApiErrorNotice error={actionError} onReload={() => { setActionError(null); jobsQuery.refetch(); }} />}
     <div className="flex gap-3 overflow-x-auto pb-4">
       {TRANSPORT_COLUMNS.map((col) => (
         <KanbanColumn
@@ -187,6 +203,7 @@ function TransportBoard() {
           ))}
         </KanbanColumn>
       ))}
+    </div>
     </div>
   );
 }

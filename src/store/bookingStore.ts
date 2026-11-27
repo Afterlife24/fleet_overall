@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { Booking } from '@/types/booking';
-import { bookings as mockBookings } from '@/services/mock/bookings';
 
 // Deterministic color palette — hash customerId → consistent color
 const CUSTOMER_COLORS = [
@@ -28,36 +26,30 @@ export function getCustomerColor(customerId: string): string {
   return CUSTOMER_COLORS[Math.abs(hash) % CUSTOMER_COLORS.length];
 }
 
-// Compute booking status from gates + reserved flag
+/**
+ * Planning status for a new or edited booking from its gates and the reserved flag. It never returns On Hire or
+ * Returned: the server sets On Hire through Start Hire and Returned from the machine's return (`returnedAt`).
+ */
 export function computeBookingStatus(booking: {
   quoted?: boolean;
   haSent?: boolean;
   haReceived?: boolean;
   lpoNumber?: string;
   lpoValidityDate?: string;
+  lpoId?: string;
   reserved?: boolean;
-  startDate: string;
-  endDate: string;
-}): Booking['status'] {
-  const today = new Date();
-  const start = new Date(booking.startDate);
-  const end = new Date(booking.endDate);
-
-  if (end < today) return 'Returned';
-
+  startDate?: string;
+  endDate?: string;
+}): 'Reserved' | 'Allocated' {
   const gatesComplete =
     !!booking.quoted &&
     !!booking.haSent &&
     !!booking.haReceived &&
-    !!booking.lpoNumber &&
-    !!booking.lpoValidityDate;
-
-  if (booking.reserved || !gatesComplete) return 'Reserved';
-  if (start <= today && today <= end) return 'On Hire';
-  return 'Allocated';
+    (!!booking.lpoId || (!!booking.lpoNumber && !!booking.lpoValidityDate));
+  return booking.reserved || !gatesComplete ? 'Reserved' : 'Allocated';
 }
 
-// Compute total value: dailyRate × days
+// Compute total value: dailyRate × days (display only; the server computes the stored total)
 export function computeTotalValue(dailyRate: number, startDate: string, endDate: string): number {
   if (!startDate || !endDate || !dailyRate) return 0;
   const start = new Date(startDate);
@@ -67,40 +59,40 @@ export function computeTotalValue(dailyRate: number, startDate: string, endDate:
 }
 
 interface BookingState {
-  // User-created bookings (persisted to localStorage)
+  /**
+   * In-memory read copy of the bookings for the retained browser screens (invoices, collection, gate, transport).
+   * The API is the authority: `services/api/bookingMirror.mirrorBookings` replaces this list on every refresh.
+   * It is never persisted or seeded. The Planner reads and writes through `bookingsApi`.
+   */
   userBookings: Booking[];
   addBooking: (booking: Booking) => void;
   updateBooking: (id: string, booking: Partial<Booking>) => void;
   deleteBooking: (id: string) => void;
-  // All bookings = mock + user created
   getAllBookings: () => Booking[];
 }
 
-export const useBookingStore = create<BookingState>()(
-  persist(
-    (set, get) => ({
-      userBookings: [],
+// Bookings used to be persisted here; remove the stale browser copy once.
+try {
+  if (typeof localStorage !== 'undefined') localStorage.removeItem('fleet-bookings-v1');
+} catch {
+  // storage unavailable
+}
 
-      addBooking: (booking) =>
-        set((state) => ({ userBookings: [...state.userBookings, booking] })),
+export const useBookingStore = create<BookingState>()((set, get) => ({
+  userBookings: [],
 
-      updateBooking: (id, data) =>
-        set((state) => ({
-          userBookings: state.userBookings.map((b) =>
-            b.id === id ? { ...b, ...data, updatedAt: new Date().toISOString() } : b
-          ),
-        })),
+  addBooking: (booking) => set((state) => ({ userBookings: [...state.userBookings, booking] })),
 
-      deleteBooking: (id) =>
-        set((state) => ({
-          userBookings: state.userBookings.filter((b) => b.id !== id),
-        })),
+  updateBooking: (id, data) => {
+    // A stray id in the patch must never overwrite the record id.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _ignored, ...rest } = data;
+    set((state) => ({
+      userBookings: state.userBookings.map((b) => (b.id === id ? { ...b, ...rest, updatedAt: new Date().toISOString() } : b)),
+    }));
+  },
 
-      getAllBookings: () => {
-        const { userBookings } = get();
-        return [...mockBookings, ...userBookings];
-      },
-    }),
-    { name: 'fleet-bookings-v1' }
-  )
-);
+  deleteBooking: (id) => set((state) => ({ userBookings: state.userBookings.filter((b) => b.id !== id) })),
+
+  getAllBookings: () => get().userBookings,
+}));

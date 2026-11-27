@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { PHIInspectionDialog } from './PHIInspectionDialog';
 import { PDIInspectionDialog } from './PDIInspectionDialog';
 import { MandatoryChecksDialog } from './MandatoryChecksDialog';
-import { MQDDialog } from './MQDDialog';
+import { ReturnIntakeSection } from './ReturnIntakeSection';
 import {
   Plus, ClipboardCheck, Camera, CheckCircle2, XCircle, MinusCircle,
   Clock, AlertTriangle, FileCheck, PenLine,
@@ -27,7 +27,7 @@ const TYPE_CONFIG: Record<InspectionType, { title: string; description: string; 
   PHI: { title: 'Pre-Hire Inspection', description: 'Complete inspection before machine dispatch to customer', icon: ClipboardCheck },
   PDI: { title: 'Pre-Delivery Inspection', description: 'Quality and regulatory checks before delivery', icon: FileCheck },
   Mandatory: { title: 'Mandatory Checks', description: 'Scheduled mandatory safety inspections', icon: Clock },
-  MQD: { title: 'Maintenance Quality Document', description: 'Quality verification of maintenance work', icon: PenLine },
+  MQD: { title: 'Machine Quality Document', description: 'Quality verification of maintenance work', icon: PenLine },
 };
 
 const RESULT_ICONS: Record<ChecklistItem['result'], React.ComponentType<{ className?: string }>> = {
@@ -51,7 +51,6 @@ export function InspectionPage({ type }: { type: InspectionType }) {
   const [phiDialogOpen, setPHIDialogOpen] = useState(false);
   const [pdiDialogOpen, setPDIDialogOpen] = useState(false);
   const [mandatoryDialogOpen, setMandatoryDialogOpen] = useState(false);
-  const [mqdDialogOpen, setMQDDialogOpen] = useState(false);
   const config = TYPE_CONFIG[type];
 
   const stats = useMemo(() => ({
@@ -114,7 +113,6 @@ export function InspectionPage({ type }: { type: InspectionType }) {
             if (type === 'PHI') setPHIDialogOpen(true);
             else if (type === 'PDI') setPDIDialogOpen(true);
             else if (type === 'Mandatory') setMandatoryDialogOpen(true);
-            else if (type === 'MQD') setMQDDialogOpen(true);
             else toastSuccess('Form coming soon!');
           }}>
             <Plus className="mr-1.5 h-4 w-4" /> New {type} Inspection
@@ -130,6 +128,8 @@ export function InspectionPage({ type }: { type: InspectionType }) {
         <Card className="p-3"><p className="text-xs text-muted-foreground">Failed</p><p className="mt-0.5 text-lg font-semibold text-rose-600 dark:text-rose-400">{stats.failed}</p></Card>
         <Card className="p-3"><p className="text-xs text-muted-foreground">Awaiting</p><p className="mt-0.5 text-lg font-semibold text-amber-600 dark:text-amber-400">{stats.awaiting}</p></Card>
       </div>
+
+      {type === 'PHI' && <ReturnIntakeSection />}
 
       <DataTable
         columns={columns}
@@ -162,7 +162,6 @@ export function InspectionPage({ type }: { type: InspectionType }) {
       <PHIInspectionDialog open={phiDialogOpen} onClose={() => setPHIDialogOpen(false)} />
       <PDIInspectionDialog open={pdiDialogOpen} onClose={() => setPDIDialogOpen(false)} />
       <MandatoryChecksDialog open={mandatoryDialogOpen} onClose={() => setMandatoryDialogOpen(false)} />
-      <MQDDialog open={mqdDialogOpen} onClose={() => setMQDDialogOpen(false)} />
     </div>
   );
 }

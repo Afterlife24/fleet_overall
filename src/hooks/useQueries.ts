@@ -1,22 +1,21 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  machineService, bookingService, workshopService, transportService,
+  machineService, workshopService,
   inspectionService, breakdownService, jobCardService, userService,
-  notificationService, branchService, customerService, dashboardService, reportService, gateService,
-  sixSigmaService, crossHireService,
+  notificationService, branchService, customerService, dashboardService, reportService,
+  sixSigmaService, crossHireService, customerANIService, hireAgreementService,
 } from '@/services/services';
 import { useBranchStore } from '@/store/branchStore';
+import { useAuthStore, JA_ORG_ID } from '@/store/authStore';
+import * as hireLink from '@/services/hireLink';
 
 export const queryKeys = {
   machines: ['machines'] as const,
   machine: (id: string) => ['machine', id] as const,
-  bookings: ['bookings'] as const,
   workshopJobs: ['workshop-jobs'] as const,
   technicians: ['technicians'] as const,
   bays: ['bays'] as const,
   transportJobs: ['transport-jobs'] as const,
-  drivers: ['drivers'] as const,
-  trucks: ['trucks'] as const,
   inspections: ['inspections'] as const,
   inspectionsByType: (type: string) => ['inspections', type] as const,
   breakdowns: ['breakdowns'] as const,
@@ -25,7 +24,6 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   branches: ['branches'] as const,
   customers: ['customers'] as const,
-  gateEntries: ['gate-entries'] as const,
   kpis: (branchId: string) => ['kpis', branchId] as const,
   fleetByCategory: (branchId: string) => ['fleet-by-category', branchId] as const,
   fleetByStatus: (branchId: string) => ['fleet-by-status', branchId] as const,
@@ -42,6 +40,10 @@ export const queryKeys = {
   crossHires: ['cross-hires'] as const,
   crossHire: (id: string) => ['cross-hire', id] as const,
   crossHireStats: (branchId: string) => ['cross-hire-stats', branchId] as const,
+  customerANIs: ['customer-anis'] as const,
+  hireAgreements: ['hire-agreements'] as const,
+  hireAgreement: (id: string) => ['hire-agreement', id] as const,
+  customerANI: (id: string) => ['customer-ani', id] as const,
 };
 
 export function useMachines() {
@@ -49,9 +51,6 @@ export function useMachines() {
 }
 export function useMachine(id: string | undefined) {
   return useQuery({ queryKey: queryKeys.machine(id || ''), queryFn: () => machineService.get(id!), enabled: !!id });
-}
-export function useBookings() {
-  return useQuery({ queryKey: queryKeys.bookings, queryFn: bookingService.list });
 }
 export function useWorkshopJobs() {
   return useQuery({ queryKey: queryKeys.workshopJobs, queryFn: workshopService.listJobs });
@@ -61,15 +60,6 @@ export function useTechnicians() {
 }
 export function useBays() {
   return useQuery({ queryKey: queryKeys.bays, queryFn: workshopService.listBays });
-}
-export function useTransportJobs() {
-  return useQuery({ queryKey: queryKeys.transportJobs, queryFn: transportService.listJobs });
-}
-export function useDrivers() {
-  return useQuery({ queryKey: queryKeys.drivers, queryFn: transportService.listDrivers });
-}
-export function useTrucks() {
-  return useQuery({ queryKey: queryKeys.trucks, queryFn: transportService.listTrucks });
 }
 export function useInspections() {
   return useQuery({ queryKey: queryKeys.inspections, queryFn: inspectionService.list });
@@ -115,9 +105,6 @@ export function useDeleteBranch() {
 }
 export function useCustomers() {
   return useQuery({ queryKey: queryKeys.customers, queryFn: customerService.list });
-}
-export function useGateEntries() {
-  return useQuery({ queryKey: queryKeys.gateEntries, queryFn: gateService.list });
 }
 export function useKPIs() {
   const branchId = useBranchStore((s) => s.selectedBranchId);
@@ -169,105 +156,11 @@ export function useBreakdownReport() {
   return useQuery({ queryKey: queryKeys.breakdownReport, queryFn: reportService.getBreakdownReport });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // MUTATION HOOKS
-// ═══════════════════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-// ── Machine Mutations ──────────────────────────────────────────────────────
-
-export function useCreateMachine() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: machineService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-      queryClient.invalidateQueries({ queryKey: ['fleet-by-category'] });
-      queryClient.invalidateQueries({ queryKey: ['fleet-by-status'] });
-    },
-  });
-}
-
-export function useUpdateMachine() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => machineService.update(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-      queryClient.invalidateQueries({ queryKey: queryKeys.machine(variables.id) });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-    },
-  });
-}
-
-export function useUpdateMachineStatus() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => machineService.updateStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-      queryClient.invalidateQueries({ queryKey: ['fleet-by-status'] });
-    },
-  });
-}
-
-export function useDeleteMachine() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: machineService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-    },
-  });
-}
-
-// ── Booking Mutations ──────────────────────────────────────────────────────
-
-export function useCreateBooking() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: bookingService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings });
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-    },
-  });
-}
-
-export function useUpdateBooking() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => bookingService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings });
-    },
-  });
-}
-
-export function useUpdateBookingStatus() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => bookingService.updateStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings });
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-    },
-  });
-}
-
-export function useDeleteBooking() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: bookingService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.bookings });
-    },
-  });
-}
-
-// ── Workshop Mutations ─────────────────────────────────────────────────────
+// â”€â”€ Workshop Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateWorkshopJob() {
   const queryClient = useQueryClient();
@@ -313,7 +206,7 @@ export function useAssignTechnician() {
   });
 }
 
-// ── Breakdown Mutations ────────────────────────────────────────────────────
+// â”€â”€ Breakdown Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateBreakdown() {
   const queryClient = useQueryClient();
@@ -359,7 +252,7 @@ export function useAssignBreakdownTechnician() {
   });
 }
 
-// ── Inspection Mutations ───────────────────────────────────────────────────
+// â”€â”€ Inspection Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useUpdateInspection() {
   const queryClient = useQueryClient();
@@ -392,30 +285,7 @@ export function useSubmitInspection() {
   });
 }
 
-// ── Gate Mutations ─────────────────────────────────────────────────────────
-
-export function useApproveGateEntry() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: gateService.approve,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.gateEntries });
-    },
-  });
-}
-
-export function useCompleteGateEntry() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: gateService.complete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.gateEntries });
-      queryClient.invalidateQueries({ queryKey: queryKeys.machines });
-    },
-  });
-}
-
-// ── User Mutations ─────────────────────────────────────────────────────────
+// â”€â”€ User Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateUser() {
   const queryClient = useQueryClient();
@@ -447,54 +317,7 @@ export function useDeleteUser() {
   });
 }
 
-// ── Gate Entry Mutations (Create) ─────────────────────────────────────────
-
-export function useCreateGateEntry() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: gateService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.gateEntries });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-    },
-  });
-}
-
-// ── Transport Job Mutations ────────────────────────────────────────────────
-
-export function useCreateTransportJob() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: transportService.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transportJobs });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-    },
-  });
-}
-
-export function useUpdateTransportJob() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => transportService.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transportJobs });
-    },
-  });
-}
-
-export function useUpdateTransportJobStatus() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => transportService.updateStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transportJobs });
-      queryClient.invalidateQueries({ queryKey: ['kpis'] });
-    },
-  });
-}
-
-// ── Job Card Mutations ─────────────────────────────────────────────────────
+// â”€â”€ Job Card Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreateJobCard() {
   const queryClient = useQueryClient();
@@ -518,7 +341,7 @@ export function useUpdateJobCard() {
   });
 }
 
-// ── Inspection Create Mutations ────────────────────────────────────────────
+// â”€â”€ Inspection Create Mutations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCreatePHIInspection() {
   const queryClient = useQueryClient();
@@ -566,7 +389,7 @@ export function useCreateMQD() {
   });
 }
 
-// ── Cross Hire ─────────────────────────────────────────────────────────────
+// â”€â”€ Cross Hire â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function useCrossHires() {
   return useQuery({ queryKey: queryKeys.crossHires, queryFn: crossHireService.list });
@@ -618,5 +441,48 @@ export function useSixSigmaMetrics() {
   return useQuery({
     queryKey: queryKeys.sixSigmaMetrics(branchId),
     queryFn: () => sixSigmaService.getMetrics(branchId),
+  });
+}
+
+// â”€â”€ Customer ANI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+export function useCustomerANIs() {
+  return useQuery({ queryKey: queryKeys.customerANIs, queryFn: customerANIService.list });
+}
+
+export function useCustomerANI(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.customerANI(id || ''),
+    queryFn: () => customerANIService.get(id!),
+    enabled: !!id,
+  });
+}
+
+// ── Hire Agreement ─────────────────────────────────────────────────────────
+
+export function useHireAgreements() {
+  return useQuery({ queryKey: queryKeys.hireAgreements, queryFn: hireAgreementService.list });
+}
+
+export function useHireAgreement(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.hireAgreement(id || ''),
+    queryFn: () => hireAgreementService.get(id!),
+    enabled: !!id,
+  });
+}
+
+export function useQuotationOptions(companyName: string) {
+  const orgId = useAuthStore((s) => s.user?.orgId ?? JA_ORG_ID);
+  return useQuery({
+    queryKey: [...queryKeys.hireAgreements, 'quotation-options', companyName] as const,
+    queryFn: () => hireLink.listQuotationOptions(orgId, companyName),
+  });
+}
+
+export function useHireAgreementOptions(customerName?: string) {
+  return useQuery({
+    queryKey: [...queryKeys.hireAgreements, 'agreement-options', customerName ?? ''] as const,
+    queryFn: () => hireLink.listAgreementOptions(customerName),
   });
 }

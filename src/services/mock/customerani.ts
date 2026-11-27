@@ -1,0 +1,105 @@
+﻿import type { CustomerANI } from '@/types/customerani';
+
+/**
+ * 5 demo customers.
+ * - Company names: alphabet-style (ABC, DEF, GHI, JKL, MNO)
+ * - Contact/ATTN names: world cricketers
+ * - All aniRavaliActive: true (Task 2)
+ * - IDs/TRNs/contacts match hireagreement.ts exactly
+ */
+export const customerANIs: CustomerANI[] = [
+  {
+    id: 'cani-1',
+    fleetLogId: 'FL-00001',
+    aniRavaliActive: true,
+    customerId: 'CUST-000125',
+    customerName: 'ABC Company LLC',
+    trn: '100412345600003',
+    attn: 'Mr. Virat Kohli',
+    address: 'ABC Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
+    billingAddress: 'ABC Tower, 14th Floor, Sheikh Zayed Rd, Dubai, UAE',
+    email: 'virat.kohli@abccompany.com',
+    attl: 500000,
+    contactNumber: '+971 50 123 4567',
+    status: 'Active',
+    branchName: 'Dubai HQ',
+    createdAt: '2024-03-10T08:00:00.000Z',
+    updatedAt: '2025-01-15T10:30:00.000Z',
+  },
+  {
+    id: 'cani-2',
+    fleetLogId: 'FL-00002',
+    aniRavaliActive: true,
+    customerId: 'CUST-000248',
+    customerName: 'DEF Company LLC',
+    trn: '100567890100003',
+    attn: 'Mr. Rohit Sharma',
+    address: 'DEF Building, Airport Rd, Abu Dhabi, UAE',
+    billingAddress: 'DEF Building, Airport Rd, Abu Dhabi, UAE',
+    email: 'rohit.sharma@defcompany.com',
+    attl: 750000,
+    contactNumber: '+971 50 234 5678',
+    status: 'Active',
+    branchName: 'Abu Dhabi',
+    createdAt: '2024-05-20T09:15:00.000Z',
+    updatedAt: '2025-02-10T11:00:00.000Z',
+  },
+  {
+    id: 'cani-3',
+    fleetLogId: 'FL-00003',
+    aniRavaliActive: true,
+    customerId: 'CUST-000371',
+    customerName: 'GHI Company PJSC',
+    trn: '100789012300003',
+    attn: 'Mr. Steve Smith',
+    address: 'GHI HQ, Palm Jumeirah, Dubai, UAE',
+    billingAddress: 'GHI HQ, Palm Jumeirah, Dubai, UAE',
+    email: 'steve.smith@ghicompany.com',
+    attl: 900000,
+    contactNumber: '+971 50 345 6789',
+    status: 'Active',
+    branchName: 'Dubai HQ',
+    createdAt: '2024-07-05T07:30:00.000Z',
+    updatedAt: '2025-03-01T14:20:00.000Z',
+  },
+  {
+    id: 'cani-4',
+    fleetLogId: 'FL-00004',
+    aniRavaliActive: true,
+    customerId: 'CUST-000419',
+    customerName: 'JKL Company LLC',
+    trn: '100890123400003',
+    attn: 'Mr. Joe Root',
+    address: 'JKL Square, Downtown Dubai, UAE',
+    billingAddress: 'JKL Square, Downtown Dubai, UAE',
+    email: 'joe.root@jklcompany.com',
+    attl: 1200000,
+    contactNumber: '+971 50 456 7890',
+    status: 'Active',
+    branchName: 'Dubai HQ',
+    createdAt: '2024-02-14T10:00:00.000Z',
+    updatedAt: '2025-01-28T09:45:00.000Z',
+  },
+  {
+    id: 'cani-5',
+    fleetLogId: 'FL-00005',
+    aniRavaliActive: true,
+    customerId: 'CUST-000532',
+    customerName: 'MNO Company LLC',
+    trn: '100901234500003',
+    attn: 'Mr. Kane Williamson',
+    address: 'MNO Centre, Al Qasimia, Sharjah, UAE',
+    billingAddress: 'MNO Centre, Al Qasimia, Sharjah, UAE',
+    email: 'kane.williamson@mnocompany.com',
+    attl: 650000,
+    contactNumber: '+971 50 567 8901',
+    status: 'Active',
+    branchName: 'Sharjah',
+    createdAt: '2024-08-18T08:45:00.000Z',
+    updatedAt: '2025-04-05T12:10:00.000Z',
+  },
+];
+
+export function getCustomerANIById(id: string): CustomerANI | undefined {
+  return customerANIs.find((c) => c.id === id);
+}

@@ -45,31 +45,6 @@ export function presetPreview(p: AppPreset): string[] {
 export const APP_PRESETS: Record<string, AppPreset[]> = {
   fleet: [
     {
-      id: 'mewp',
-      name: 'MEWP Rental',
-      description: 'Booms, scissor lifts and telehandlers — access equipment rental',
-      icon: '🏗️',
-      records: {
-        machines: [
-          { assetNumber: 'F101', make: 'JLG', model: '450AJ', category: 'Articulating Boom', status: 'Available', branchName: 'Head Office', powerSource: 'Diesel', workingHeight: 16, platformHeight: 10, capacity: 230, year: 2022, hoursOperated: 1200 },
-          { assetNumber: 'F102', make: 'Genie', model: 'GS-4047', category: 'Scissor Lift', status: 'Available', branchName: 'Head Office', powerSource: 'Electric', workingHeight: 14, platformHeight: 12, capacity: 350, year: 2023, hoursOperated: 400 },
-          { assetNumber: 'F103', make: 'Manitou', model: 'MT1840', category: 'Telehandler', status: 'On Hire', branchName: 'Head Office', powerSource: 'Diesel', workingHeight: 18, platformHeight: 0, capacity: 4000, year: 2021, hoursOperated: 3100, currentCustomer: 'Demo Client' },
-        ],
-      },
-    },
-    {
-      id: 'construction',
-      name: 'Construction Equipment',
-      description: 'Excavators, loaders and heavy plant',
-      icon: '🚜',
-      records: {
-        machines: [
-          { assetNumber: 'C201', make: 'CAT', model: '320', category: 'Trailer Mounted', status: 'Available', branchName: 'Head Office', powerSource: 'Diesel', workingHeight: 0, platformHeight: 0, capacity: 20000, year: 2020, hoursOperated: 5400 },
-          { assetNumber: 'C202', make: 'JCB', model: '3CX', category: 'Trailer Mounted', status: 'Available', branchName: 'Head Office', powerSource: 'Diesel', workingHeight: 0, platformHeight: 0, capacity: 8000, year: 2022, hoursOperated: 2100 },
-        ],
-      },
-    },
-    {
       id: 'blank',
       name: 'Start blank',
       description: 'Add your own machines from scratch',
